@@ -367,20 +367,18 @@ class PomodoroApp:
         if self.is_focus_time:
             self.current_cycle += 1
             if self.current_cycle >= self.cycles:
-                messagebox.showinfo("Pomodoro Finished", "All cycles complete! Great job.")
                 self.reset_pomodoro()
             else:
                 self.is_focus_time = False
                 self.remaining_time = self.short_break
                 self.break_button.config(state=tk.NORMAL)
-                messagebox.showinfo("Break Time", "Time for a short break! Relax a bit.")
+                self.start_button.config(text="Start Break", command=self.start_break, state=tk.NORMAL)  
         else:
             self.is_focus_time = True
             self.remaining_time = self.focus_length
             self.break_button.config(state=tk.DISABLED)
-            if self.current_cycle < self.cycles:
-                messagebox.showinfo("Focus Time", "Back to work! Stay focused.")
-        self.start_button.config(state=tk.DISABLED)
+            self.start_button.config(text="Start", command=self.start_pomodoro, state=tk.NORMAL)  
+
         self.pause_button.config(state=tk.DISABLED)
         self.reset_button.config(state=tk.NORMAL)
         self.pomodoro_timer()
