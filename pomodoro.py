@@ -254,7 +254,7 @@ class PomodoroApp:
             else:
                 prompt = (
                     f"Compose a concise, unique and creative single-paragraph message for {self.user_name}, who has just finished a work session as a {self.profession} at {self.company}. "
-                    "The message should suggest a simple 5-minute break activity that aids relaxation and mental rejuvenation and grounded in scientific research. "
+                    "The message should suggest a simple 5-minute break activity that aids relaxatio, physical wellbeing, and mental rejuvenation and grounded in scientific research. "
                     "It should be brief, easy to understand, and suitable for being read aloud by a voice assistant. "
                     "The suggested activity should be beneficial for someone in {self.profession} and not be overly detailed. "
                 )
@@ -372,12 +372,14 @@ class PomodoroApp:
                 self.is_focus_time = False
                 self.remaining_time = self.short_break
                 self.break_button.config(state=tk.NORMAL)
-                self.start_button.config(text="Start Break", command=self.start_break, state=tk.NORMAL)  
+                # Ensure the button says "Start Break" when it's time for a break
+                self.start_button.config(text="Start Break", command=self.start_break, state=tk.NORMAL)
         else:
             self.is_focus_time = True
             self.remaining_time = self.focus_length
             self.break_button.config(state=tk.DISABLED)
-            self.start_button.config(text="Start", command=self.start_pomodoro, state=tk.NORMAL)  
+            # Change the button to say "Start" to indicate it will start a work session
+            self.start_button.config(text="Start", command=self.start_pomodoro, state=tk.NORMAL)
 
         self.pause_button.config(state=tk.DISABLED)
         self.reset_button.config(state=tk.NORMAL)
