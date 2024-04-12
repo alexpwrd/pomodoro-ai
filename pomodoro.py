@@ -1,12 +1,10 @@
 import tkinter as tk
 from tkinter import ttk
-from tkinter import messagebox
 from openai import OpenAI
 import os
 from dotenv import load_dotenv
 import platform
 import threading
-import subprocess
 from pathlib import Path
 from pydub import AudioSegment
 from pydub.playback import play
