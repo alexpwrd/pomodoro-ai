@@ -7,7 +7,13 @@ from dotenv import load_dotenv
 import platform
 import threading
 import subprocess
+from pathlib import Path
+from pydub import AudioSegment
+from pydub.playback import play
+import warnings
 
+# Ignore DeprecationWarning
+warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 load_dotenv()
 
@@ -72,6 +78,8 @@ class PomodoroApp:
 
         # Set the window's position
         master.geometry('%dx%d+%d+%d' % (window_width, window_height, x, y))
+
+        self.speech_file_path = Path(__file__).parent / "quote.mp3"
 
         # User customization
         self.user_name = os.getenv("USER_NAME", "Generic User")
@@ -302,8 +310,8 @@ class PomodoroApp:
                     {"role": "system", "content": f"You are a motivational AI assistant to a {self.profession} at {self.company} named {self.user_name}. Aim for uniqueness, creativity, humour, and scientific grounding in your messages. Your messages will be read outloud to the user to format them in a way that would be easy for an apple OS voice to say outloud. "},
                     {"role": "user", "content": prompt}
                 ],
-                model="gpt-3.5-turbo",
-                temperature=0.9,  # Set the creativity/variability of the response
+                model="gpt-4-turbo",
+                temperature=0.8,  # Set the creativity/variability of the response
                 max_tokens=200,  # Limit the response length
             )
             message = chat_completion.choices[0].message.content.strip()
@@ -324,25 +332,46 @@ class PomodoroApp:
             self.quote_var.set("Failed to fetch idea. Check your internet connection.")
             print(f"Error fetching idea: {e}")
 
+    def text_to_speech(self, text):
+        """Converts text to speech and saves as an MP3 file using the user's preferred voice."""
+        # Fetch the user's preferred voice setting from environment variables with 'onyx' as the default
+        user_voice = os.getenv("USER_VOICE", "onyx")
+        
+        # Define valid voice options for error checking
+        valid_voices = {"alloy", "echo", "fable", "onyx", "nova", "shimmer"}
+        
+        # Check if the provided voice setting is valid
+        if user_voice not in valid_voices:
+            print(f"Invalid voice setting '{user_voice}'. Using default 'onyx'.")
+            user_voice = "onyx"
+
+        try:
+            response = client.audio.speech.create(
+                model="tts-1",
+                voice=user_voice,
+                input=text,
+                response_format="mp3"
+            )
+            response.stream_to_file(self.speech_file_path)
+            self.play_audio(self.speech_file_path)
+        except Exception as e:
+            print(f"Error in text-to-speech conversion: {e}")
+
+
+    def play_audio(self, file_path):
+        """Plays an MP3 file using pydub."""
+        try:
+            song = AudioSegment.from_mp3(file_path)
+            play(song)
+        except Exception as e:
+            print(f"Error playing audio file: {e}")
+
     def speak_quote(self, message):
-        """Speak the quote if not muted."""
+        """Modified to use text_to_speech if not muted."""
         if not self.is_muted:
-            try:
-                # Use the subprocess module to avoid shell interpretation issues
-                command = ['say', '-v', 'Samantha', message]
-                print(f"Executing command: {' '.join(command)}")
-                subprocess.run(command, check=True)
-            except Exception as e:
-                print(f"Error executing speech command: {e}")
-        # Clear the status message after the speaking action is completed.
-        self.status_var.set("")  # Clears the "Speaking..." status.
-        # Check if the pomodoro session is running and adjust the "Start" button accordingly.
-        if not self.running:
-            # Only re-enable the "Start" button if no session is active.
-            self.start_button.config(text="Start", state=tk.NORMAL)
-        else:
-            # Keep the button disabled if a session is running.
-            self.start_button.config(text="Start", state=tk.DISABLED)
+            self.text_to_speech(message)
+        # Clears the "Speaking..." status and adjusts button states.
+        self.status_var.set("")
 
     def update_display(self, remaining_time):
         mins, secs = divmod(remaining_time, 60)

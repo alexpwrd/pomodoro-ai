@@ -1,49 +1,53 @@
-import openai
-from dotenv import load_dotenv
+from openai import OpenAI
+from pathlib import Path
+from pydub import AudioSegment
+from pydub.playback import play
 import os
+from dotenv import load_dotenv
+import warnings
 
-def create_speech(text, voice="alloy", audio_format="mp3", speed=1.0):
-    """
-    Generates spoken audio from text using OpenAI's TTS API.
+# Ignore DeprecationWarning
+warnings.filterwarnings("ignore", category=DeprecationWarning)
 
-    Args:
-    text (str): The text to convert to speech, up to 4096 characters.
-    voice (str): The TTS voice to use. Options include 'alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'.
-    audio_format (str): The audio file format. Options include 'mp3', 'opus', 'aac', 'flac', 'wav', 'pcm'.
-    speed (float): The speed of the speech. Can range from 0.25 to 4.0.
+# Load environment variables
+load_dotenv()
 
-    Returns:
-    The path to the generated audio file.
-    """
-    # Load environment variables
-    load_dotenv()
+# Initialize the OpenAI client with an API key from the environment variables
+client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
 
-    # Get the API key from .env file
-    api_key = os.getenv("OPENAI_API_KEY")
-
-    # Configure the API client
-    openai.api_key = api_key
-
-    # Generate the speech
-    response = openai.Audio.speech.create(
-        model="tts-1",
-        voice=voice,
-        input=text,
-        response_format=audio_format,
-        speed=speed
+def generate_poem():
+    # Generate a poem using the chat completions API
+    completion = client.chat.completions.create(
+        model="gpt-4-turbo",
+        messages=[
+            {"role": "system", "content": "You are a poetic assistant, skilled in explaining complex programming concepts with creative flair."},
+            {"role": "user", "content": "Compose a short 4 line poem with a kiteboarding/kitesurfing theme."}
+        ]
     )
+    return completion.choices[0].message.content
 
-    # Define the path for the audio file
-    file_path = f"output_speech.{audio_format}"
+def text_to_speech(text, file_path):
+    # Convert text to speech and save as an audio file
+    response = client.audio.speech.create(
+        model="tts-1",
+        voice="onyx",
+        input=text,
+        response_format="mp3",
+        speed=1.0
+    )
+    response.stream_to_file(file_path)
 
-    # Stream the audio content to a file
-    with open(file_path, "wb") as audio_file:
-        audio_file.write(response.content)
+def play_audio(file_path):
+    # Play an MP3 file using pydub
+    song = AudioSegment.from_mp3(file_path)
+    play(song)
 
-    return file_path
+def main():
+    poem_text = generate_poem()
+    print("Generated Poem:", poem_text)
+    speech_file_path = Path(__file__).parent / "voice.mp3"
+    text_to_speech(poem_text, speech_file_path)
+    play_audio(speech_file_path)
 
-# Example usage
 if __name__ == "__main__":
-    text_to_speak = "Hello, this is a test of OpenAI's text to speech conversion."
-    audio_file = create_speech(text_to_speak, voice="alloy", audio_format="mp3", speed=1.0)
-    print(f"Generated audio file: {audio_file}")
+    main()
