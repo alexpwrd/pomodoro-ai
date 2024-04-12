@@ -59,8 +59,8 @@ class PomodoroApp:
         master.configure(bg=self.colors["background"])
 
         # Set the initial size of the window
-        window_width = 500
-        window_height = 500
+        window_width = 600
+        window_height = 600
 
         # Get screen width and height
         screen_width = master.winfo_screenwidth()
@@ -74,25 +74,37 @@ class PomodoroApp:
         master.geometry('%dx%d+%d+%d' % (window_width, window_height, x, y))
 
         # User customization
-        self.user_name = "Alex"
-        self.profession = "Coding Developer"
-        self.company = "AGI Trader"
+        self.user_name = os.getenv("USER_NAME", "Generic User")
+        self.profession = os.getenv("PROFESSION", "Generic Profession")
+        self.company = os.getenv("COMPANY", "Self Employed")
+
+        # Initialize counters and limits for work and break sessions
+        self.work_sessions_completed = 0
+        self.break_sessions_completed = 0
+        self.max_work_sessions = 4  # Maximum work sessions per cycle
+        self.max_break_sessions = 4  # Maximum break sessions per cycle
 
         # Dropdown for selecting focus time
-        self.focus_options = [15, 25, 50]
+        self.focus_options = [1, 15, 25, 50]
         self.selected_focus_length = tk.IntVar(master)
         self.selected_focus_length.set(self.focus_options[1])
 
+        # Break time options
+        self.break_options = [1, 5, 10]  # Break times in minutes
+        self.selected_break_length = tk.IntVar(master)
+        self.selected_break_length.set(self.break_options[1])  # Default to 5 minutes
+
         # Initialize variables
         self.focus_length = self.selected_focus_length.get() * 60
-        self.short_break = 5 * 60
+        self.short_break = self.selected_break_length.get() * 60  # Convert minutes to seconds
         self.remaining_time = self.focus_length
         self.cycles = 4
+        self.total_session_limit = 8  # Define the total session limit here
         self.current_cycle = 0
         self.is_focus_time = True
         self.running = False
         self.is_muted = False 
-        self.is_resuming = False  # Add this line
+        self.is_resuming = False 
 
         # Progress Bar - Repositioned and resized
         self.progress = ttk.Progressbar(master, orient="horizontal", mode="determinate", maximum=self.focus_length)
@@ -105,7 +117,7 @@ class PomodoroApp:
         style.configure("green.Horizontal.TProgressbar", background=self.colors["progress_bar"], thickness=20)
 
         # Timer display - Make it responsive to window resizing
-        self.time_var = tk.StringVar(master, value="25:00")
+        self.time_var = tk.StringVar(master, value="15:00")
         self.timer_display = tk.Label(master, textvariable=self.time_var, font=("Helvetica", 48), bg=self.colors["background"], fg=self.colors["text"])
         self.timer_display.pack(expand=True)
 
@@ -138,11 +150,32 @@ class PomodoroApp:
         # Create the circle with the new dimensions
         self.state_indicator = self.state_indicator_canvas.create_oval(circle_x0, circle_y0, circle_x1, circle_y1, fill=self.colors["state_indicator"]["default"])
 
-        # Dropdown for selecting focus time
-        self.focus_dropdown = tk.OptionMenu(master, self.selected_focus_length, *self.focus_options, command=self.update_focus_length)
+        # Frame for focus time selection
+        focus_frame = tk.Frame(master, bg=self.colors["background"])
+        focus_frame.pack(pady=(10, 0))  # Removed the fill=tk.X and set the padding for top only
+        focus_label = tk.Label(focus_frame, text="Focus Time (min):", bg=self.colors['background'], fg=self.colors['text'])
+        focus_label.pack(side=tk.LEFT, padx=(0, 10))
+        self.focus_dropdown = tk.OptionMenu(focus_frame, self.selected_focus_length, *self.focus_options, command=self.update_focus_length)
         self.focus_dropdown.config(bg=self.colors["background"], fg=self.colors["text"], highlightthickness=0, font=("Helvetica", 14, "bold"), borderwidth=0)
-        self.focus_dropdown["menu"].config(bg=self.colors["background"], fg=self.colors["text"], font=("Helvetica", 12))  # This changes the dropdown items
-        self.focus_dropdown.pack(padx=10, pady=10)  # Add padding around the dropdown
+        self.focus_dropdown["menu"].config(bg=self.colors["background"], fg=self.colors["text"], font=("Helvetica", 12))
+        self.focus_dropdown.pack(side=tk.LEFT)
+        focus_frame.pack(anchor='center')  # This will center the frame in the packing order
+
+        # Frame for break time selection
+        break_frame = tk.Frame(master, bg=self.colors["background"])
+        break_frame.pack(pady=(10, 0))  # Removed the fill=tk.X and set the padding for top only
+        break_label = tk.Label(break_frame, text="Break Time (min):", bg=self.colors['background'], fg=self.colors['text'])
+        break_label.pack(side=tk.LEFT, padx=(0, 10))
+        self.break_dropdown = tk.OptionMenu(break_frame, self.selected_break_length, *self.break_options, command=self.update_break_length)
+        self.break_dropdown.pack(side=tk.LEFT)
+        break_frame.pack(anchor='center')  # This will center the frame in the packing order
+
+
+        # Updated labels to display session counters with limits
+        self.work_session_label = tk.Label(master, text=f"Work Sessions: {self.work_sessions_completed}/{self.max_work_sessions}", bg=self.colors["background"], fg=self.colors["text"])
+        self.work_session_label.pack(side=tk.TOP, pady=(0, 5))
+        self.break_session_label = tk.Label(master, text=f"Break Sessions: {self.break_sessions_completed}/{self.max_break_sessions}", bg=self.colors["background"], fg=self.colors["text"])
+        self.break_session_label.pack(side=tk.TOP, pady=(0, 10))
 
         # Create a frame for buttons to keep them centered and at the bottom
         self.buttons_frame = tk.Frame(master, bg=self.colors["background"])
@@ -198,6 +231,14 @@ class PomodoroApp:
         button.bind("<Leave>", on_leave)
 
         return button
+    
+    def update_break_length(self, *args):
+        self.short_break = self.selected_break_length.get() * 60  # Convert minutes to seconds
+        if not self.is_focus_time:  # If currently in break, update the timer display and progress bar maximum
+            self.remaining_time = self.short_break
+            self.update_display(self.remaining_time)
+            self.progress["maximum"] = self.short_break
+            self.progress["value"] = 0
 
     def toggle_mute(self):
         self.is_muted = not self.is_muted
@@ -244,11 +285,9 @@ class PomodoroApp:
         try:
             if not for_break:
                 prompt = (
-                    f"Find a unique and original brief motivational quote from a renowned figure in the {self.profession} industry that could inspire {self.user_name}, who is about to start a work session at {self.company}. "
+                    f"Find one random and brief motivational quote from a range of a successful persons in the {self.profession} industry that could inspire {self.user_name}, who is about to start a work session at {self.company}. "
                     "The message should start with {self.user_name}'s name to immediately capture their attention, followed by the quote. "
-                    "It should resonate with the challenges and triumphs specific to {self.profession}, encouraging perseverance, innovation, and productivity. "
-                    "Conclude with a short encouragement, tailored to {self.user_name}'s journey towards success in their profession. Avoid attributing the quote directly in the message. "
-                    "Please ensure each quote is unique, creative, and has not been used before. Be brief."
+                    "Conclude with a short encouragement, use irony and humor to encourage, tailored to {self.user_name}'s journey towards success in their profession. Avoid attributing the quote directly in the message. "
                     "This message will be read to the user so write it in a way that is brief and easy to read and easy for a voice assistant to read aloud, no longer than a single paragraph."
                 )
             else:
@@ -263,7 +302,7 @@ class PomodoroApp:
                     {"role": "system", "content": f"You are a motivational AI assistant to a {self.profession} at {self.company} named {self.user_name}. Aim for uniqueness, creativity, humour, and scientific grounding in your messages. Your messages will be read outloud to the user to format them in a way that would be easy for an apple OS voice to say outloud. "},
                     {"role": "user", "content": prompt}
                 ],
-                model="gpt-4-turbo",
+                model="gpt-3.5-turbo",
                 temperature=0.9,  # Set the creativity/variability of the response
                 max_tokens=200,  # Limit the response length
             )
@@ -317,6 +356,7 @@ class PomodoroApp:
             self.reset_button.config(state=tk.NORMAL)
             self.break_button.config(state=tk.DISABLED)
             self.focus_dropdown.config(state="disabled")
+            self.break_dropdown.config(state="disabled")
             if not self.is_resuming:  # Only fetch a new quote if not resuming
                 self.fetch_motivational_quote()
             self.is_resuming = False  # Reset the flag
@@ -334,6 +374,8 @@ class PomodoroApp:
         self.reset_button.config(state=tk.NORMAL)
         self.break_button.config(state=tk.NORMAL)
         self.update_state_indicator("paused")
+        self.focus_dropdown.config(state="normal")
+        self.break_dropdown.config(state="normal")
         print("Timer paused.")
 
     def reset_pomodoro(self):
@@ -347,9 +389,12 @@ class PomodoroApp:
         self.reset_button.config(state=tk.DISABLED)
         self.break_button.config(state=tk.NORMAL)
         self.focus_dropdown.config(state="normal")
-        self.is_resuming = False  # Ensure a new session starts fresh
+        self.break_dropdown.config(state="normal")
+        self.is_resuming = False 
         self.progress["value"] = 0
         self.update_state_indicator("default")
+        self.work_sessions_completed = 0
+        self.break_sessions_completed = 0
         print("Timer reset.")
 
     def pomodoro_timer(self):
@@ -359,31 +404,32 @@ class PomodoroApp:
             self.progress["value"] = self.progress["maximum"] - self.remaining_time
             self.master.after(1000, self.pomodoro_timer)
         elif self.running:
-            self.play_sound()
             self.switch_mode()
 
     def switch_mode(self):
-        # Automatically switch between focus and break periods
+        self.running = False  # Stop the current timer
         if self.is_focus_time:
-            self.current_cycle += 1
-            if self.current_cycle >= self.cycles:
-                self.reset_pomodoro()
-            else:
-                self.is_focus_time = False
-                self.remaining_time = self.short_break
-                self.break_button.config(state=tk.NORMAL)
-                # Ensure the button says "Start Break" when it's time for a break
-                self.start_button.config(text="Start Break", command=self.start_break, state=tk.NORMAL)
+            self.play_sound(for_break=True)
+            self.work_sessions_completed += 1
+            if self.work_sessions_completed >= self.max_work_sessions:
+                self.reset_pomodoro()  # Reset if maximum work sessions are reached
+                return
+            self.is_focus_time = False
+            self.remaining_time = self.short_break
+            self.update_state_indicator("break")
+            self.work_session_label.config(text=f"Work Sessions: {self.work_sessions_completed}/{self.max_work_sessions}")
+            self.start_break()  # Start the break session
         else:
+            self.play_sound(for_break=False)
+            self.break_sessions_completed += 1
+            if self.break_sessions_completed >= self.max_break_sessions:
+                self.reset_pomodoro()  # Reset if maximum break sessions are reached
+                return
             self.is_focus_time = True
             self.remaining_time = self.focus_length
-            self.break_button.config(state=tk.DISABLED)
-            # Change the button to say "Start" to indicate it will start a work session
-            self.start_button.config(text="Start", command=self.start_pomodoro, state=tk.NORMAL)
-
-        self.pause_button.config(state=tk.DISABLED)
-        self.reset_button.config(state=tk.NORMAL)
-        self.pomodoro_timer()
+            self.update_state_indicator("focus")
+            self.break_session_label.config(text=f"Break Sessions: {self.break_sessions_completed}/{self.max_break_sessions}")
+            self.start_pomodoro()  # Start the focus session
 
     def play_sound(self, for_break=False):
         if platform.system() == "Windows":
