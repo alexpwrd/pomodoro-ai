@@ -16,7 +16,7 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 class PomodoroApp:
     def __init__(self, master):
         self.master = master
-        master.title("Pomodoro Timer")
+        master.title("Pomodoro AI")
 
         self.colors = {
             "background": '#2D2D2D',  # A deep gray for the background
