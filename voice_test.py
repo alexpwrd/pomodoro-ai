@@ -1,7 +1,7 @@
 from openai import OpenAI
 from pathlib import Path
-from pydub import AudioSegment
-from pydub.playback import play
+import sounddevice as sd
+import soundfile as sf
 import os
 from dotenv import load_dotenv
 import warnings
@@ -20,8 +20,8 @@ def generate_poem():
     completion = client.chat.completions.create(
         model="gpt-4-turbo",
         messages=[
-            {"role": "system", "content": "You are a poetic assistant, skilled in explaining complex programming concepts with creative flair."},
-            {"role": "user", "content": "Compose a short 4 line poem with a kiteboarding/kitesurfing theme."}
+            {"role": "system", "content": "Ты поэтический помощник, умело объясняющий сложные концепции программирования с творческим подходом."},
+            {"role": "user", "content": "Составь короткое четырехстрочное стихотворение на тему кайтсерфинга."}
         ]
     )
     return completion.choices[0].message.content
@@ -30,22 +30,23 @@ def text_to_speech(text, file_path):
     # Convert text to speech and save as an audio file
     response = client.audio.speech.create(
         model="tts-1",
-        voice="onyx",
+        voice="shimmer",
         input=text,
-        response_format="mp3",
+        response_format="opus",
         speed=1.0
     )
     response.stream_to_file(file_path)
 
 def play_audio(file_path):
-    # Play an MP3 file using pydub
-    song = AudioSegment.from_mp3(file_path)
-    play(song)
+    # Play an opus file using soundfile and sounddevice
+    data, samplerate = sf.read(file_path, dtype='float32')
+    sd.play(data, samplerate)
+    sd.wait()  # Wait until the file has finished playing
 
 def main():
     poem_text = generate_poem()
     print("Generated Poem:", poem_text)
-    speech_file_path = Path(__file__).parent / "voice.mp3"
+    speech_file_path = Path(__file__).parent / "voice.opus"
     text_to_speech(poem_text, speech_file_path)
     play_audio(speech_file_path)
 

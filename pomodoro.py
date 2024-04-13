@@ -6,8 +6,8 @@ from dotenv import load_dotenv
 import platform
 import threading
 from pathlib import Path
-from pydub import AudioSegment
-from pydub.playback import play
+import sounddevice as sd
+import soundfile as sf
 import warnings
 
 # Ignore DeprecationWarning
@@ -348,7 +348,7 @@ class PomodoroApp:
                 model="tts-1",
                 voice=user_voice,
                 input=text,
-                response_format="mp3"
+                response_format="opus"
             )
             response.stream_to_file(self.speech_file_path)
             self.play_audio(self.speech_file_path)
@@ -357,12 +357,13 @@ class PomodoroApp:
 
 
     def play_audio(self, file_path):
-        """Plays an MP3 file using pydub."""
         try:
-            song = AudioSegment.from_mp3(file_path)
-            play(song)
+            data, samplerate = sf.read(file_path, dtype='float32')
+            sd.play(data, samplerate)
+            sd.wait()  # Wait until the file has finished playing
         except Exception as e:
             print(f"Error playing audio file: {e}")
+
 
     def speak_quote(self, message):
         """Modified to use text_to_speech if not muted."""

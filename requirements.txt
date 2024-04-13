@@ -1,4 +1,6 @@
 openai
 python-dotenv
-tkinter
 pydub
+sounddevice
+soundfile
+numpy
