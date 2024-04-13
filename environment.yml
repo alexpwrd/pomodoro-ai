@@ -1,0 +1,12 @@
+name: pomodoro-ai
+channels:
+  - defaults
+dependencies:
+  - python=3.11
+  - numpy=1.26.4
+  - pip:
+    - openai==1.17.0
+    - python-dotenv==1.0.1
+    - pydub==0.25.1
+    - sounddevice==0.4.6
+    - soundfile==0.12.1

@@ -1,14 +1,19 @@
-import tkinter as tk
-from tkinter import ttk
-from openai import OpenAI
+# pomodoro.py is the main file that runs the pomodoro application
+
 import os
-from dotenv import load_dotenv
 import platform
 import threading
+import warnings
+import random
 from pathlib import Path
+
 import sounddevice as sd
 import soundfile as sf
-import warnings
+import tkinter as tk
+from dotenv import load_dotenv
+from openai import OpenAI
+from tkinter import ttk
+from ui import UIConfig
 
 # Ignore DeprecationWarning
 warnings.filterwarnings("ignore", category=DeprecationWarning)
@@ -22,45 +27,9 @@ class PomodoroApp:
         self.master = master
         master.title("Pomodoro AI")
 
-        self.colors = {
-            "background": '#2D2D2D',  # A deep gray for the background
-            "text": '#F0F0F0',  # A bright gray for text, ensuring good readability
-            "progress_bar": 'forest green',  
-            "start_button": {
-                'bg': 'forest green', 'fg': '#F0F0F0',
-                'hover_bg': '#333333', 'hover_fg': '#FFFFFF',  # Dark gray for hover, white text
-                'disabled_bg': '#2D2D2D', 'disabled_fg': '#A6A6A6'
-            },
-            "pause_button": {
-                'bg': '#3E3E3E', 'fg': '#F0F0F0',
-                'hover_bg': '#333333', 'hover_fg': '#FFFFFF',  # Dark gray for hover, white text
-                'disabled_bg': '#2D2D2D', 'disabled_fg': '#A6A6A6'
-            },
-            "reset_button": {
-                'bg': '#3E3E3E', 'fg': '#F0F0F0',
-                'hover_bg': '#333333', 'hover_fg': '#FFFFFF',  # Dark gray for hover, white text
-                'disabled_bg': '#2D2D2D', 'disabled_fg': '#A6A6A6'
-            },
-            "break_button": {
-                'bg': '#3E3E3E', 'fg': '#F0F0F0',
-                'hover_bg': '#333333', 'hover_fg': '#FFFFFF',  # Dark gray for hover, white text
-                'disabled_bg': '#2D2D2D', 'disabled_fg': '#A6A6A6'
-            },
-            "mute_button": {
-                'bg': '#3E3E3E', 'fg': '#F0F0F0',
-                'hover_bg': '#333333', 'hover_fg': '#FFFFFF',  # Dark gray for hover, white text
-                'disabled_bg': '#2D2D2D', 'disabled_fg': '#A6A6A6'
-            },
-            "state_indicator": {
-                "focus": 'forest green',  # Green for focus
-                "break": 'yellow',  # Blue for break
-                "paused": 'goldenrod',  # Yellow for paused
-                "default": 'gray'  # Light gray for default
-            }
-        }
-
-        # Use the centralized background color
-        master.configure(bg=self.colors["background"])
+        # Initialize UIConfig and use its colors
+        self.ui = UIConfig()
+        master.configure(bg=self.ui.colors["background"])  # Use background color from UIConfig
 
         # Set the initial size of the window
         window_width = 600
@@ -91,12 +60,12 @@ class PomodoroApp:
         self.max_break_sessions = 4  # Maximum break sessions per cycle
 
         # Dropdown for selecting focus time
-        self.focus_options = [1, 15, 25, 50]
+        self.focus_options = [1, 15, 25, 50, 90]
         self.selected_focus_length = tk.IntVar(master)
         self.selected_focus_length.set(self.focus_options[1])
 
         # Break time options
-        self.break_options = [1, 5, 10]  # Break times in minutes
+        self.break_options = [1, 5, 10, 15]  # Break times in minutes
         self.selected_break_length = tk.IntVar(master)
         self.selected_break_length.set(self.break_options[1])  # Default to 5 minutes
 
@@ -117,24 +86,19 @@ class PomodoroApp:
         self.progress.pack(pady=(10, 20), fill=tk.X, padx=10)  # Adjust pady for padding, fill=tk.X to stretch across the window
         self.progress.config(style="green.Horizontal.TProgressbar")
 
-        # Configure the style of the progress bar
-        style = ttk.Style(master)
-        style.theme_use('default')
-        style.configure("green.Horizontal.TProgressbar", background=self.colors["progress_bar"], thickness=20)
-
         # Timer display - Make it responsive to window resizing
         self.time_var = tk.StringVar(master, value="15:00")
-        self.timer_display = tk.Label(master, textvariable=self.time_var, font=("Helvetica", 48), bg=self.colors["background"], fg=self.colors["text"])
+        self.timer_display = tk.Label(master, textvariable=self.time_var, font=("Helvetica", 48), bg=self.ui.colors["background"], fg=self.ui.colors["text"])
         self.timer_display.pack(expand=True)
 
         # Quote display
         self.quote_var = tk.StringVar(master, value="Welcome to AI Pomodoro, click start to begin!!")
-        self.quote_display = tk.Label(master, textvariable=self.quote_var, font=("Helvetica", 14), wraplength=400, bg=self.colors["background"], fg=self.colors["text"])
+        self.quote_display = tk.Label(master, textvariable=self.quote_var, font=("Helvetica", 14), wraplength=400, bg=self.ui.colors["background"], fg=self.ui.colors["text"])
         self.quote_display.pack()
 
         # Status message display
         self.status_var = tk.StringVar(master, value="")
-        self.status_display = tk.Label(master, textvariable=self.status_var, font=("Helvetica", 12), bg=self.colors["background"], fg=self.colors["text"])
+        self.status_display = tk.Label(master, textvariable=self.status_var, font=("Helvetica", 12), bg=self.ui.colors["background"], fg=self.ui.colors["text"])
         self.status_display.pack()
 
         # Define the size of the circle
@@ -144,7 +108,7 @@ class PomodoroApp:
         canvas_size = circle_diameter + 20  # Add 20 pixels of padding around the circle
 
         # State Indicator Canvas - Adjust the size of the canvas
-        self.state_indicator_canvas = tk.Canvas(master, width=canvas_size, height=canvas_size, bg=self.colors["background"], highlightthickness=0)
+        self.state_indicator_canvas = tk.Canvas(master, width=canvas_size, height=canvas_size, bg=self.ui.colors["background"], highlightthickness=0)
         self.state_indicator_canvas.pack(pady=(10, 10))  # Add some padding around the canvas
 
         # Calculate the coordinates for the circle within the canvas
@@ -154,53 +118,53 @@ class PomodoroApp:
         circle_y1 = circle_y0 + circle_diameter
 
         # Create the circle with the new dimensions
-        self.state_indicator = self.state_indicator_canvas.create_oval(circle_x0, circle_y0, circle_x1, circle_y1, fill=self.colors["state_indicator"]["default"])
+        self.state_indicator = self.state_indicator_canvas.create_oval(circle_x0, circle_y0, circle_x1, circle_y1, fill=self.ui.colors["state_indicator"]["default"])
 
         # Frame for focus time selection
-        focus_frame = tk.Frame(master, bg=self.colors["background"])
-        focus_frame.pack(pady=(10, 0))  # Removed the fill=tk.X and set the padding for top only
-        focus_label = tk.Label(focus_frame, text="Focus Time (min):", bg=self.colors['background'], fg=self.colors['text'])
+        focus_frame = tk.Frame(master, bg=self.ui.colors["background"])
+        focus_frame.pack(pady=(10, 0))  # This will center the frame in the packing order
+        focus_label = self.ui.create_label(focus_frame, "Focus Time (min):")
         focus_label.pack(side=tk.LEFT, padx=(0, 10))
-        self.focus_dropdown = tk.OptionMenu(focus_frame, self.selected_focus_length, *self.focus_options, command=self.update_focus_length)
-        self.focus_dropdown.config(bg=self.colors["background"], fg=self.colors["text"], highlightthickness=0, font=("Helvetica", 14, "bold"), borderwidth=0)
-        self.focus_dropdown["menu"].config(bg=self.colors["background"], fg=self.colors["text"], font=("Helvetica", 12))
+        self.focus_dropdown = self.ui.create_option_menu(focus_frame, self.selected_focus_length, self.focus_options, self.update_focus_length)
         self.focus_dropdown.pack(side=tk.LEFT)
-        focus_frame.pack(anchor='center')  # This will center the frame in the packing order
 
         # Frame for break time selection
-        break_frame = tk.Frame(master, bg=self.colors["background"])
-        break_frame.pack(pady=(10, 0))  # Removed the fill=tk.X and set the padding for top only
-        break_label = tk.Label(break_frame, text="Break Time (min):", bg=self.colors['background'], fg=self.colors['text'])
+        break_frame = tk.Frame(master, bg=self.ui.colors["background"])
+        break_frame.pack(pady=(10, 0))  # This will center the frame in the packing order
+        break_label = self.ui.create_label(break_frame, "Break Time (min):")
         break_label.pack(side=tk.LEFT, padx=(0, 10))
-        self.break_dropdown = tk.OptionMenu(break_frame, self.selected_break_length, *self.break_options, command=self.update_break_length)
+        self.break_dropdown = self.ui.create_option_menu(break_frame, self.selected_break_length, self.break_options, self.update_break_length)
         self.break_dropdown.pack(side=tk.LEFT)
-        break_frame.pack(anchor='center')  # This will center the frame in the packing order
-
 
         # Updated labels to display session counters with limits
-        self.work_session_label = tk.Label(master, text=f"Work Sessions: {self.work_sessions_completed}/{self.max_work_sessions}", bg=self.colors["background"], fg=self.colors["text"])
+        self.work_session_label = self.ui.create_label(self.master, f"Work Sessions: {self.work_sessions_completed}/{self.max_work_sessions}")
+        self.break_session_label = self.ui.create_label(self.master, f"Break Sessions: {self.break_sessions_completed}/{self.max_break_sessions}")
+
+        # Adjust label packing
         self.work_session_label.pack(side=tk.TOP, pady=(0, 5))
-        self.break_session_label = tk.Label(master, text=f"Break Sessions: {self.break_sessions_completed}/{self.max_break_sessions}", bg=self.colors["background"], fg=self.colors["text"])
         self.break_session_label.pack(side=tk.TOP, pady=(0, 10))
 
-        # Create a frame for buttons to keep them centered and at the bottom
-        self.buttons_frame = tk.Frame(master, bg=self.colors["background"])
-        self.buttons_frame.pack(side=tk.BOTTOM, fill=tk.X, pady=(0, 10))
+        # Create a frame for buttons to keep them centered at the bottom
+        self.buttons_frame_outer = tk.Frame(master, bg=self.ui.colors["background"])
+        self.buttons_frame_outer.pack(side=tk.BOTTOM, fill=tk.X, expand=True)  # This frame expands
 
-        # Buttons with hover effects, now added to the buttons_frame
-        self.start_button = self.create_button(self.buttons_frame, "Start", self.start_pomodoro, "start_button")
-        self.pause_button = self.create_button(self.buttons_frame, "Pause", self.pause_pomodoro, "pause_button", state=tk.DISABLED)
-        self.reset_button = self.create_button(self.buttons_frame, "Reset", self.reset_pomodoro, "reset_button", state=tk.DISABLED)
-        self.break_button = self.create_button(self.buttons_frame, "Take a Break", self.start_break, "break_button", state=tk.NORMAL)
-        self.mute_button = self.create_button(self.buttons_frame, "Mute", self.toggle_mute, "mute_button")
+        # Create another inner frame that will actually hold the buttons
+        self.buttons_frame = tk.Frame(self.buttons_frame_outer, bg=self.ui.colors["background"])
+        self.buttons_frame.pack(pady=10)  # Center this frame within the outer frame
 
-        # Adjust create_button to not pack buttons immediately, allowing for layout control here
-        # Pack buttons in the buttons_frame to center them
-        self.start_button.pack(side=tk.LEFT, expand=True)
-        self.pause_button.pack(side=tk.LEFT, expand=True)
-        self.reset_button.pack(side=tk.LEFT, expand=True)
-        self.break_button.pack(side=tk.LEFT, expand=True)
-        self.mute_button.pack(side=tk.LEFT, expand=True)
+        # In the __init__ method where buttons are being created
+        self.start_button = self.ui.create_modern_button(self.buttons_frame, "Start", self.start_pomodoro)
+        self.pause_button = self.ui.create_modern_button(self.buttons_frame, "Pause", self.pause_pomodoro, state=tk.DISABLED)
+        self.reset_button = self.ui.create_modern_button(self.buttons_frame, "Reset", self.reset_pomodoro, state=tk.DISABLED)
+        self.break_button = self.ui.create_modern_button(self.buttons_frame, "Take a Break", self.start_break)
+        self.mute_button = self.ui.create_modern_button(self.buttons_frame, "Mute", self.toggle_mute)
+
+        # Adjust button packing to center them within the inner frame
+        self.start_button.pack(side=tk.LEFT, padx=5, expand=False)
+        self.pause_button.pack(side=tk.LEFT, padx=5, expand=False)
+        self.reset_button.pack(side=tk.LEFT, padx=5, expand=False)
+        self.break_button.pack(side=tk.LEFT, padx=5, expand=False)
+        self.mute_button.pack(side=tk.LEFT, padx=5, expand=False)
 
         # Initialize progress bar
         self.progress["maximum"] = self.focus_length
@@ -208,7 +172,7 @@ class PomodoroApp:
 
     def create_button(self, master, text, command, button_key, state=tk.NORMAL):
         # Retrieve button color configuration using button_key
-        button_colors = self.colors[button_key]
+        button_colors = self.ui.colors[button_key]
         
         # Create a unique style name for this button
         style_name = f"{button_key}.TButton"
@@ -248,10 +212,12 @@ class PomodoroApp:
 
     def toggle_mute(self):
         self.is_muted = not self.is_muted
+        # Update the button style using the new method from UIConfig
+        self.ui.update_mute_button_style(self.is_muted)
         if self.is_muted:
-            self.mute_button.config(text="Unmute", bg=self.colors["mute_button"]['bg'], fg='black')  # Lighter gray to indicate muted state
+            self.mute_button.config(text="Unmute")
         else:
-            self.mute_button.config(text="Mute", bg=self.colors["mute_button"]['bg'], fg=self.colors["mute_button"]['fg'])  # Original gray color
+            self.mute_button.config(text="Mute")
         print("Muted" if self.is_muted else "Unmuted")
 
     def update_focus_length(self, *args):
@@ -281,31 +247,77 @@ class PomodoroApp:
         # Update button states.
         self.start_button.config(state=tk.DISABLED)
         self.pause_button.config(state=tk.NORMAL)
-        self.reset_button.config(state=tk.NORMAL)
+        self.reset_button.config(state=tk.DISABLED)
         self.break_button.config(state=tk.DISABLED)
 
         self.update_state_indicator("break")  # Update state indicator to yellow for break time
 
+    import random
+
     def fetch_motivational_quote(self, for_break=False):
         print("Fetching idea...")
         try:
+            themes = [
+                "perseverance",  # Emphasizes the importance of persistence and resilience in achieving goals.
+                "efficiency",  # Focuses on optimizing processes and maximizing output with minimal wasted effort.
+                "teamwork",  # Highlights the benefits of collaborative work and mutual support.
+                "leadership",  # Stresses the role of guiding and inspiring others.
+                "learning",  # Encourages continual growth and acquisition of new skills.
+                "growth",  # Focuses on personal and professional development.
+                "adaptability",  # Emphasizes flexibility and the ability to adjust to new conditions.
+                "focus",  # Concentrates on the ability to maintain attention and avoid distractions.
+                "productivity",  # Relates to maximizing output and effectiveness in work tasks.
+                "balance",  # Stresses the importance of maintaining a healthy work-life balance.
+                "well-being",  # Focuses on overall mental and physical health.
+                "mental clarity",  # Highlights the importance of clear thinking and decision-making.
+                "optimism",  # Encourages a positive outlook and expectation of good outcomes.
+                "resilience",  # Focuses on the ability to recover quickly from difficulties.
+                "innovation",  # Stresses creativity and the introduction of new ideas.
+                "success",  # General theme celebrating achievements and accomplishments.
+                "energy",  # Discusses maintaining high levels of enthusiasm and vigor.
+                "motivation",  # Encourages finding reasons and incentives to perform well.
+                "happiness",  # Focuses on achieving a state of well-being and contentment.
+                "do what you love"  # Encourages passion-driven work and finding joy in professional activities.
+            ]
+            theme = random.choice(themes)
+            print(f"Selected theme: {theme}")
+
             if not for_break:
                 prompt = (
-                    f"Find one random and brief motivational quote from a range of a successful persons in the {self.profession} industry that could inspire {self.user_name}, who is about to start a work session at {self.company}. "
-                    "The message should start with {self.user_name}'s name to immediately capture their attention, followed by the quote. "
-                    "Conclude with a short encouragement, use irony and humor to encourage, tailored to {self.user_name}'s journey towards success in their profession. Avoid attributing the quote directly in the message. "
-                    "This message will be read to the user so write it in a way that is brief and easy to read and easy for a voice assistant to read aloud, no longer than a single paragraph."
+                    f"Generate a motivational quote related to {theme} from a successful individual in the {self.profession} industry. This quote should inspire {self.user_name}, who is about to start a work session at {self.company}. "
+                    f"Begin the message with {self.user_name}'s name to grab their attention immediately. Follow with the quote and conclude with a brief, encouraging statement that incorporates humor and irony. "
+                    f"Design this message to be concise, engaging, and easily readable aloud by a voice assistant. The entire message should be a single, impactful paragraph that subtly blends humor/irony with motivation ,without directly attributing the quote to a specific person."
                 )
             else:
+                activities = [
+                    "deep breathing",  # A quick way to relax and reduce stress
+                    "quick stretches",  # Helps relieve muscle tension and improve circulation
+                    "a short walk",  # Boosts mood and energy
+                    "listening to music",  # Reduces stress and improves mood
+                    "drinking a glass of water",  # Keeps you hydrated and refreshes your mind
+                    "doing a few yoga poses",  # Enhances flexibility and mental clarity
+                    "meditating for a few minutes",  # Improves focus and reduces anxiety
+                    "doodling or sketching",  # Stimulates creativity and relaxation
+                    "reading a page of a book",  # A brief escape that relaxes the mind
+                    "enjoying a healthy snack",  # Provides energy and stabilizes blood sugar levels
+                    "stepping outside for fresh air",  # Refreshes and reinvigorates
+                    "practicing a quick mindfulness exercise",  # Helps center thoughts and reduce stress
+                    "performing a brief body scan meditation",  # Increases bodily awareness and relaxes
+                    "writing down three things you're grateful for"  # Boosts positivity and mental well-being
+                ]
+                activity = random.choice(activities)
+                print(f"Selected theme: {activity}") 
                 prompt = (
-                    f"Compose a concise, unique and creative single-paragraph message for {self.user_name}, who has just finished a work session as a {self.profession} at {self.company}. "
-                    "The message should suggest a simple 5-minute break activity that aids relaxatio, physical wellbeing, and mental rejuvenation and grounded in scientific research. "
-                    "It should be brief, easy to understand, and suitable for being read aloud by a voice assistant. "
-                    "The suggested activity should be beneficial for someone in {self.profession} and not be overly detailed. "
+                    f"Compose a concise, unique, and creative short message for {self.user_name}, who has just finished a work session as a {self.profession} at {self.company}. "
+                    f"Suggest a simple 5 or 10 minute break activity like {activity}. "
+                    f"Keep the suggestion brief, easy to understand, and suitable for being read aloud by a voice assistant. "
+                    f"Focus on activities that are scientifically proven to reduce stress and enhance focus. "
+                    f"Add a touch of humor or irony to lighten the mood—because even serious break activities can have a fun side."
                 )
+
             chat_completion = client.chat.completions.create(
                 messages=[
-                    {"role": "system", "content": f"You are a motivational AI assistant to a {self.profession} at {self.company} named {self.user_name}. Aim for uniqueness, creativity, humour, and scientific grounding in your messages. Your messages will be read outloud to the user to format them in a way that would be easy for an apple OS voice to say outloud. "},
+                    {"role": "system", "content": f"You are a motivational AI assistant to a {self.profession} at {self.company} named {self.user_name}. Aim for uniqueness, creativity, humour, and scientific grounding in your messages. Your messages will be read out loud to the user to format them in a way that would be easy for an apple OS voice to say out loud. "},
                     {"role": "user", "content": prompt}
                 ],
                 model="gpt-4-turbo",
@@ -319,7 +331,7 @@ class PomodoroApp:
                 self.quote_var.set(message)
             print("Idea fetched successfully.")
             
-            # Temporarily update that its speaking
+            # Temporarily update that it's speaking
             self.status_var.set("Speaking...")
 
             # Start a new thread to speak the quote without blocking the GUI
@@ -381,7 +393,7 @@ class PomodoroApp:
             self.running = True
             self.start_button.config(state=tk.DISABLED)
             self.pause_button.config(state=tk.NORMAL)
-            self.reset_button.config(state=tk.NORMAL)
+            self.reset_button.config(state=tk.DISABLED)
             self.break_button.config(state=tk.DISABLED)
             self.focus_dropdown.config(state="disabled")
             self.break_dropdown.config(state="disabled")
@@ -469,12 +481,12 @@ class PomodoroApp:
                 winsound.Beep(550, 1000)  # Example frequency and duration for work
         else:  # macOS and Linux
             if for_break:
-                os.system('say "Time to take a break."')
+                os.system('say "Break time."')
             else:
-                os.system('say "Time to start a new work timer."')
+                os.system('say "Focus time."')
 
     def update_state_indicator(self, state):
-        color = self.colors["state_indicator"].get(state, self.colors["state_indicator"]["default"])
+        color = self.ui.colors["state_indicator"].get(state, self.ui.colors["state_indicator"]["default"])
         self.state_indicator_canvas.itemconfig(self.state_indicator, fill=color)
 
 if __name__ == "__main__":
