@@ -233,7 +233,6 @@ class PomodoroApp:
         if self.running and self.is_focus_time:
             self.running = False
             self.is_focus_time = False
-            print("Work session paused for a break.")
         
         # Now start the break.
         self.running = True
@@ -255,33 +254,30 @@ class PomodoroApp:
     import random
 
     def fetch_motivational_quote(self, for_break=False):
-        print("Fetching idea...")
         try:
             themes = [
-                "perseverance",  # Emphasizes the importance of persistence and resilience in achieving goals.
-                "efficiency",  # Focuses on optimizing processes and maximizing output with minimal wasted effort.
-                "teamwork",  # Highlights the benefits of collaborative work and mutual support.
-                "leadership",  # Stresses the role of guiding and inspiring others.
-                "learning",  # Encourages continual growth and acquisition of new skills.
-                "growth",  # Focuses on personal and professional development.
-                "adaptability",  # Emphasizes flexibility and the ability to adjust to new conditions.
-                "focus",  # Concentrates on the ability to maintain attention and avoid distractions.
-                "productivity",  # Relates to maximizing output and effectiveness in work tasks.
-                "balance",  # Stresses the importance of maintaining a healthy work-life balance.
-                "well-being",  # Focuses on overall mental and physical health.
-                "mental clarity",  # Highlights the importance of clear thinking and decision-making.
-                "optimism",  # Encourages a positive outlook and expectation of good outcomes.
-                "resilience",  # Focuses on the ability to recover quickly from difficulties.
-                "innovation",  # Stresses creativity and the introduction of new ideas.
-                "success",  # General theme celebrating achievements and accomplishments.
-                "energy",  # Discusses maintaining high levels of enthusiasm and vigor.
-                "motivation",  # Encourages finding reasons and incentives to perform well.
-                "happiness",  # Focuses on achieving a state of well-being and contentment.
-                "do what you love"  # Encourages passion-driven work and finding joy in professional activities.
+                "perseverance",
+                "efficiency",
+                "teamwork",
+                "leadership",
+                "learning",
+                "growth",
+                "adaptability",
+                "focus",
+                "productivity",
+                "balance",
+                "well-being",
+                "mental clarity",
+                "optimism",
+                "resilience",
+                "innovation",
+                "success",
+                "energy",
+                "motivation",
+                "happiness",
+                "do what you love"
             ]
             theme = random.choice(themes)
-            print(f"Selected theme: {theme}")
-
             if not for_break:
                 prompt = (
                     f"Generate a motivational quote related to {theme} from a successful individual in the {self.profession} industry. This quote should inspire {self.user_name}, who is about to start a work session at {self.company}. "
@@ -290,23 +286,22 @@ class PomodoroApp:
                 )
             else:
                 activities = [
-                    "deep breathing",  # A quick way to relax and reduce stress
-                    "quick stretches",  # Helps relieve muscle tension and improve circulation
-                    "a short walk",  # Boosts mood and energy
-                    "listening to music",  # Reduces stress and improves mood
-                    "drinking a glass of water",  # Keeps you hydrated and refreshes your mind
-                    "doing a few yoga poses",  # Enhances flexibility and mental clarity
-                    "meditating for a few minutes",  # Improves focus and reduces anxiety
-                    "doodling or sketching",  # Stimulates creativity and relaxation
-                    "reading a page of a book",  # A brief escape that relaxes the mind
-                    "enjoying a healthy snack",  # Provides energy and stabilizes blood sugar levels
-                    "stepping outside for fresh air",  # Refreshes and reinvigorates
-                    "practicing a quick mindfulness exercise",  # Helps center thoughts and reduce stress
-                    "performing a brief body scan meditation",  # Increases bodily awareness and relaxes
-                    "writing down three things you're grateful for"  # Boosts positivity and mental well-being
+                    "deep breathing",
+                    "quick stretches",
+                    "a short walk",
+                    "listening to music",
+                    "drinking a glass of water",
+                    "doing a few yoga poses",
+                    "meditating for a few minutes",
+                    "doodling or sketching",
+                    "reading a page of a book",
+                    "enjoying a healthy snack",
+                    "stepping outside for fresh air",
+                    "practicing a quick mindfulness exercise",
+                    "performing a brief body scan meditation",
+                    "writing down three things you're grateful for"
                 ]
                 activity = random.choice(activities)
-                print(f"Selected theme: {activity}") 
                 prompt = (
                     f"Compose a concise, unique, and creative short message for {self.user_name}, who has just finished a work session as a {self.profession} at {self.company}. "
                     f"Suggest a simple 5 or 10 minute break activity like {activity}. "
@@ -329,7 +324,6 @@ class PomodoroApp:
                 self.quote_var.set(f"Break Idea: {message}")
             else:
                 self.quote_var.set(message)
-            print("Idea fetched successfully.")
             
             # Temporarily update that it's speaking
             self.status_var.set("Speaking...")
@@ -405,7 +399,6 @@ class PomodoroApp:
             self.progress["value"] = 0
             self.pomodoro_timer()
             self.update_state_indicator("focus")
-            print("Pomodoro started.")
 
     def pause_pomodoro(self):
         self.running = False
@@ -481,9 +474,9 @@ class PomodoroApp:
                 winsound.Beep(550, 1000)  # Example frequency and duration for work
         else:  # macOS and Linux
             if for_break:
-                os.system('say "Break time."')
+                os.system('say -v Tessa "Break time."')
             else:
-                os.system('say "Focus time."')
+                os.system('say -v Tessa "Focus time."')
 
     def update_state_indicator(self, state):
         color = self.ui.colors["state_indicator"].get(state, self.ui.colors["state_indicator"]["default"])
