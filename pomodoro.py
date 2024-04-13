@@ -385,9 +385,10 @@ class PomodoroApp:
             self.break_button.config(state=tk.DISABLED)
             self.focus_dropdown.config(state="disabled")
             self.break_dropdown.config(state="disabled")
-            if not self.is_resuming:  # Only fetch a new quote if not resuming
-                self.fetch_motivational_quote()
-            self.is_resuming = False  # Reset the flag
+            if not self.is_resuming:
+                threading.Thread(target=self.fetch_motivational_quote).start()  # Run this in a separate thread
+            else:
+                self.is_resuming = False
             self.progress["maximum"] = self.focus_length
             self.progress["value"] = 0
             self.pomodoro_timer()
