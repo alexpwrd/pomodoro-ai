@@ -1,174 +1,233 @@
 # pomodoro.py is the main file that runs the pomodoro application
 
 import os
-import platform
 import threading
 import warnings
-import random
 from pathlib import Path
-
+from openai import OpenAI
 import sounddevice as sd
 import soundfile as sf
 import tkinter as tk
-from dotenv import load_dotenv
-from openai import OpenAI
-from tkinter import ttk
-from ui import UIConfig
+from tkinter import ttk, PhotoImage
+from utils.ui import UIConfig
+from utils.settings import SettingsManager, APIKeyManager, SettingsWindow
+from utils.window_utils import set_window_icon
+from utils.audio_utils import play_sound, toggle_mute
+from utils.ai_utils import AIUtils
+import logging
+from tkinter import simpledialog
+
+
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 # Ignore DeprecationWarning
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
-load_dotenv()
-
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-
 class PomodoroApp:
     def __init__(self, master):
         self.master = master
-        master.title("Pomodoro AI")
-
-        # Initialize UIConfig and use its colors
         self.ui = UIConfig()
-        master.configure(bg=self.ui.colors["background"])  # Use background color from UIConfig
+        self.status_var = tk.StringVar(value="Ready")  # Define status_var with a default message
+        self.initialize_managers()
+        self.check_and_initialize_settings()  # New method to handle first-time setup and loading
+        self.load_api_settings()
+        self.load_user_settings() 
+        self.initialize_timing()
+        self.initialize_state_flags()
+        self.setup_window_layout()
+        self.setup_sidebar()
+        self.initialize_ui_elements()
 
-        # Set the initial size of the window
-        window_width = 600
-        window_height = 600
+        self.load_api_settings()
+        # Make sure to only initialize AIUtils if client is set
+        if self.client is not None:
+            self.ai_utils = AIUtils(self.client, self.user_name, self.profession, self.company)
+        else:
+            self.ai_utils = None
 
-        # Get screen width and height
-        screen_width = master.winfo_screenwidth()
-        screen_height = master.winfo_screenheight()
+    def initialize_managers(self):
+        self.api_key_manager = APIKeyManager()
+        self.settings_manager = SettingsManager(callback=self.handle_settings_change)
 
-        # Calculate position for window to be at the top center
-        x = (screen_width / 2) - (window_width / 2)
-        y = 0  # Set y position to 0 to position the window at the very top
+    def handle_settings_change(self, key, value):
+        if key == "API_KEY":
+            self.load_api_settings()  # Reload API settings which will reinitialize the AIUtils with new API key
 
-        # Set the window's position
-        master.geometry('%dx%d+%d+%d' % (window_width, window_height, x, y))
+    def check_and_initialize_settings(self):
+        # Check for the existence of settings and initialize if necessary
+        settings_exist = self.settings_manager.settings_exist()
 
-        self.speech_file_path = Path(__file__).parent / "quote.mp3"
+        if not settings_exist:
+            logger.info("First-time setup required. Initializing default settings.")
+            self.settings_manager.create_default_settings()
+        
+        # Load settings without checking for API key
+        self.load_user_settings()
 
-        # User customization
-        self.user_name = os.getenv("USER_NAME", "Generic User")
-        self.profession = os.getenv("PROFESSION", "Generic Profession")
-        self.company = os.getenv("COMPANY", "Self Employed")
+    def prompt_for_api_key(self):
+        # Prompt the user to enter their OpenAI API key if not set
+        api_key = simpledialog.askstring("API Key Required", "Enter your OpenAI API key:", parent=self.master)
+        if api_key:
+            self.api_key_manager.set_api_key(api_key)
+            logger.info("API key set successfully.")
+        else:
+            logger.warning("No API key provided; some functionalities will be restricted.")
+            messagebox.showinfo("API Key", "You can set the API key later via Settings.")
 
-        # Initialize counters and limits for work and break sessions
-        self.work_sessions_completed = 0
-        self.break_sessions_completed = 0
-        self.max_work_sessions = 4  # Maximum work sessions per cycle
-        self.max_break_sessions = 4  # Maximum break sessions per cycle
+    def load_api_settings(self):
+        self.openai_api_key = self.api_key_manager.get_api_key()
+        self.client = OpenAI(api_key=self.openai_api_key) if self.openai_api_key else None
+        if self.client:
+            self.ai_utils = AIUtils(self.client, self.user_name, self.profession, self.company)
+        else:
+            logger.error("API Key is not set or invalid. AI functionalities will be limited.")
+            self.ai_utils = None
 
-        # Dropdown for selecting focus time
-        self.focus_options = [1, 15, 25, 50, 90]
-        self.selected_focus_length = tk.IntVar(master)
-        self.selected_focus_length.set(self.focus_options[1])
+    def load_user_settings(self):
+        self.user_name = self.settings_manager.get_setting("USER_NAME", "Default User")
+        self.profession = self.settings_manager.get_setting("PROFESSION", "Default Profession")
+        self.company = self.settings_manager.get_setting("COMPANY", "Default Company")
+        self.ai_voice = self.settings_manager.get_setting("AI_VOICE", "alloy")  # Correct setting for AI voice
 
-        # Break time options
-        self.break_options = [1, 5, 10, 15]  # Break times in minutes
-        self.selected_break_length = tk.IntVar(master)
-        self.selected_break_length.set(self.break_options[1])  # Default to 5 minutes
-
-        # Initialize variables
+    def initialize_timing(self):
+        self.focus_options = [1, 15, 25, 50, 90]  # in minutes
+        self.break_options = [1, 5, 10, 15]  # in minutes
+        self.selected_focus_length = tk.IntVar(self.master, value=25)  # Default to 25 minutes
+        self.selected_break_length = tk.IntVar(self.master, value=5)  # Default to 5 minutes
         self.focus_length = self.selected_focus_length.get() * 60
-        self.short_break = self.selected_break_length.get() * 60  # Convert minutes to seconds
-        self.remaining_time = self.focus_length
-        self.cycles = 4
-        self.total_session_limit = 8  # Define the total session limit here
-        self.current_cycle = 0
-        self.is_focus_time = True
-        self.running = False
-        self.is_muted = False 
-        self.is_resuming = False 
+        self.short_break = self.selected_break_length.get() * 60
+        self.remaining_time = self.focus_length  # Start with the focus time
+        self.max_work_sessions = 4
+        self.max_break_sessions = 4
 
-        # Progress Bar - Repositioned and resized
-        self.progress = ttk.Progressbar(master, orient="horizontal", mode="determinate", maximum=self.focus_length)
-        self.progress.pack(pady=(10, 20), fill=tk.X, padx=10)  # Adjust pady for padding, fill=tk.X to stretch across the window
+    def initialize_state_flags(self):
+        self.running = False 
+        self.is_focus_time = True 
+        self.is_muted = False 
+        self.is_resuming = False  
+        self.work_sessions_completed = 0  
+        self.break_sessions_completed = 0  
+        self.current_cycle = 0  
+
+    def setup_window_layout(self):
+        set_window_icon(self.master, 'tomato_icon.png')
+        self.master.configure(bg=self.ui.colors["background"])
+        window_width, window_height = 900, 600
+        screen_width, screen_height = self.master.winfo_screenwidth(), self.master.winfo_screenheight()
+        x = int((screen_width / 2) - (window_width / 2))  # Convert to int
+        y = 0  # Keep y as an integer
+        self.master.geometry(f'{window_width}x{window_height}+{x}+{y}')
+
+    def setup_sidebar(self):
+        logging.debug("Setting up sidebar.")
+
+        if hasattr(self, 'sidebar') and self.sidebar.winfo_exists():
+            logging.debug("Destroying existing sidebar.")
+            self.sidebar.destroy()
+
+        logging.debug("Creating new sidebar.")
+
+        self.sidebar = tk.Frame(self.master, bg=self.ui.colors["sidebar_bg"], width=150, height=600)
+        # Create a sidebar frame with a darker background
+        self.sidebar = tk.Frame(self.master, bg=self.ui.colors["sidebar_bg"], width=150, height=600)
+        self.sidebar.pack(expand=False, fill='y', side='left', anchor='nw')
+        self.sidebar.pack_propagate(False)  # Prevent the sidebar from resizing to fit its children
+
+        # Time selection frame
+        time_selection_frame = tk.Frame(self.sidebar, bg=self.ui.colors["sidebar_bg"])
+        time_selection_frame.pack(pady=10, fill='x')
+
+        # Focus time dropdown
+        focus_label = tk.Label(time_selection_frame, text="Focus Time (min):", bg=self.ui.colors["sidebar_bg"], fg=self.ui.colors["text"])
+        focus_label.pack(side='top')
+        self.focus_dropdown = self.ui.create_option_menu(time_selection_frame, self.selected_focus_length, self.focus_options, self.update_focus_length)
+        self.focus_dropdown.pack(side='top')
+
+        # Break time dropdown
+        break_label = tk.Label(time_selection_frame, text="Break Time (min):", bg=self.ui.colors["sidebar_bg"], fg=self.ui.colors["text"])
+        break_label.pack(side='top')
+        self.break_dropdown = self.ui.create_option_menu(time_selection_frame, self.selected_break_length, self.break_options, self.update_break_length)
+        self.break_dropdown.pack(side='top')
+
+        # Control buttons frame
+        control_buttons_frame = tk.Frame(self.sidebar, bg=self.ui.colors["sidebar_bg"])
+        control_buttons_frame.pack(pady=10, fill='x')
+
+        # Adding buttons
+        self.start_button = self.ui.create_modern_button(control_buttons_frame, "Start", self.start_pomodoro)
+        self.pause_button = self.ui.create_modern_button(control_buttons_frame, "Pause", self.pause_pomodoro, state=tk.DISABLED)
+        self.reset_button = self.ui.create_modern_button(control_buttons_frame, "Reset", self.reset_pomodoro, state=tk.DISABLED)
+        self.break_button = self.ui.create_modern_button(control_buttons_frame, "Take a Break", self.start_break)
+        self.mute_button = self.ui.create_modern_button(control_buttons_frame, "Mute", lambda: self.handle_toggle_mute())
+        for button in [self.start_button, self.pause_button, self.reset_button, self.break_button, self.mute_button]:
+            button.pack(side='top', pady=5)
+
+        # Session statistics
+        session_stats_frame = tk.Frame(self.sidebar, bg=self.ui.colors['sidebar_bg'])
+        session_stats_frame.pack(pady=10, fill='x')
+        self.work_session_label = tk.Label(session_stats_frame, text=f"Work Sessions: {self.work_sessions_completed}/{self.max_work_sessions}", bg=self.ui.colors['sidebar_bg'], fg=self.ui.colors['text'])
+        self.work_session_label.pack(side='top')
+        self.break_session_label = tk.Label(session_stats_frame, text=f"Break Sessions: {self.break_sessions_completed}/{self.max_break_sessions}", bg=self.ui.colors['sidebar_bg'], fg=self.ui.colors['text'])
+        self.break_session_label.pack(side='top')
+
+        # Add Settings Button at the bottom of the sidebar
+        self.settings_button = self.ui.create_modern_button(control_buttons_frame, "Settings", self.open_settings_window, style='Modern.TButton')
+        self.settings_button.pack(side='bottom', pady=10)
+
+    def initialize_ui_elements(self):
+        # Progress bar for showing the current session's progress
+        self.progress = ttk.Progressbar(self.master, orient="horizontal", mode="determinate", maximum=self.focus_length)
+        self.progress.pack(pady=(10, 20), fill=tk.X, padx=10)
         self.progress.config(style="green.Horizontal.TProgressbar")
 
-        # Timer display - Make it responsive to window resizing
-        self.time_var = tk.StringVar(master, value="15:00")
-        self.timer_display = tk.Label(master, textvariable=self.time_var, font=("Helvetica", 48), bg=self.ui.colors["background"], fg=self.ui.colors["text"])
-        self.timer_display.pack(expand=True)
+        # Frame for Circle + Timer Display
+        self.center_frame = tk.Frame(self.master, bg=self.ui.colors["background"])
+        self.center_frame.pack(expand=True)
 
-        # Quote display
-        self.quote_var = tk.StringVar(master, value="Welcome to AI Pomodoro, click start to begin!!")
-        self.quote_display = tk.Label(master, textvariable=self.quote_var, font=("Helvetica", 14), wraplength=400, bg=self.ui.colors["background"], fg=self.ui.colors["text"])
-        self.quote_display.pack()
-
-        # Status message display
-        self.status_var = tk.StringVar(master, value="")
-        self.status_display = tk.Label(master, textvariable=self.status_var, font=("Helvetica", 12), bg=self.ui.colors["background"], fg=self.ui.colors["text"])
-        self.status_display.pack()
-
-        # Define the size of the circle
-        circle_diameter = 40  # This will be the diameter of the circle
-
-        # Calculate the canvas size to include the circle with some padding
-        canvas_size = circle_diameter + 20  # Add 20 pixels of padding around the circle
-
-        # State Indicator Canvas - Adjust the size of the canvas
-        self.state_indicator_canvas = tk.Canvas(master, width=canvas_size, height=canvas_size, bg=self.ui.colors["background"], highlightthickness=0)
-        self.state_indicator_canvas.pack(pady=(10, 10))  # Add some padding around the canvas
-
-        # Calculate the coordinates for the circle within the canvas
+        # Circle (State Indicator)
+        circle_diameter = 40
+        canvas_size = circle_diameter + 20
+        self.state_indicator_canvas = tk.Canvas(self.center_frame, width=canvas_size, height=canvas_size, bg=self.ui.colors["background"], highlightthickness=0)
+        self.state_indicator_canvas.pack(side=tk.LEFT, pady=(10, 10), padx=(10,0))
         circle_x0 = (canvas_size - circle_diameter) / 2
         circle_y0 = circle_x0
         circle_x1 = circle_x0 + circle_diameter
         circle_y1 = circle_y0 + circle_diameter
-
-        # Create the circle with the new dimensions
         self.state_indicator = self.state_indicator_canvas.create_oval(circle_x0, circle_y0, circle_x1, circle_y1, fill=self.ui.colors["state_indicator"]["default"])
 
-        # Frame for focus time selection
-        focus_frame = tk.Frame(master, bg=self.ui.colors["background"])
-        focus_frame.pack(pady=(10, 0))  # This will center the frame in the packing order
-        focus_label = self.ui.create_label(focus_frame, "Focus Time (min):")
-        focus_label.pack(side=tk.LEFT, padx=(0, 10))
-        self.focus_dropdown = self.ui.create_option_menu(focus_frame, self.selected_focus_length, self.focus_options, self.update_focus_length)
-        self.focus_dropdown.pack(side=tk.LEFT)
+        # Timer Display
+        self.time_var = tk.StringVar(self.master, value="25:00")
+        self.timer_display = tk.Label(self.center_frame, textvariable=self.time_var, font=("Helvetica", 48), bg=self.ui.colors["background"], fg=self.ui.colors["text"])
+        self.timer_display.pack(side=tk.LEFT, padx=(10,0))
 
-        # Frame for break time selection
-        break_frame = tk.Frame(master, bg=self.ui.colors["background"])
-        break_frame.pack(pady=(10, 0))  # This will center the frame in the packing order
-        break_label = self.ui.create_label(break_frame, "Break Time (min):")
-        break_label.pack(side=tk.LEFT, padx=(0, 10))
-        self.break_dropdown = self.ui.create_option_menu(break_frame, self.selected_break_length, self.break_options, self.update_break_length)
-        self.break_dropdown.pack(side=tk.LEFT)
+        # Inspirational or motivational quote display
+        self.quote_var = tk.StringVar(self.master, value="Welcome to AI Pomodoro, click start to begin!!")
+        self.quote_display = tk.Label(self.master, textvariable=self.quote_var, font=("Helvetica", 14), wraplength=400, bg=self.ui.colors["background"], fg=self.ui.colors["text"])
+        self.quote_display.pack(pady=(10, 20))
 
-        # Updated labels to display session counters with limits
-        self.work_session_label = self.ui.create_label(self.master, f"Work Sessions: {self.work_sessions_completed}/{self.max_work_sessions}")
-        self.break_session_label = self.ui.create_label(self.master, f"Break Sessions: {self.break_sessions_completed}/{self.max_break_sessions}")
+        # Frame for chat window and instructions
+        self.chat_frame = tk.Frame(self.master, bg=self.ui.colors["background"])
+        self.chat_frame.pack(pady=(20, 10), padx=10, fill=tk.X)  # Use fill=tk.X to keep it centered and expand horizontally
 
-        # Adjust label packing
-        self.work_session_label.pack(side=tk.TOP, pady=(0, 5))
-        self.break_session_label.pack(side=tk.TOP, pady=(0, 10))
+        # Instruction label for chat input
+        self.chat_instruction_label = tk.Label(self.chat_frame, text="Write down up to 3 tasks and save:", bg=self.ui.colors["background"], fg=self.ui.colors["text"])
+        self.chat_instruction_label.pack(pady=(0, 5))
 
-        # Create a frame for buttons to keep them centered at the bottom
-        self.buttons_frame_outer = tk.Frame(master, bg=self.ui.colors["background"])
-        self.buttons_frame_outer.pack(side=tk.BOTTOM, fill=tk.X, expand=True)  # This frame expands
+        # Chat input text box
+        self.chat_input = tk.Text(self.chat_frame, height=3, width=50, bg=self.ui.colors["entry"]["field_bg"], fg=self.ui.colors["text"])
+        self.chat_input.pack(side=tk.LEFT, padx=(10, 0), pady=(0, 10), expand=True, fill=tk.X)  # Expanded to fill the frame horizontally
 
-        # Create another inner frame that will actually hold the buttons
-        self.buttons_frame = tk.Frame(self.buttons_frame_outer, bg=self.ui.colors["background"])
-        self.buttons_frame.pack(pady=10)  # Center this frame within the outer frame
+        # Save Task button
+        self.chat_submit_button = self.ui.create_modern_button(self.chat_frame, "Save Tasks", self.save_task, style='Modern.TButton')
+        self.chat_submit_button.pack(side=tk.RIGHT, padx=(10, 0), pady=(0, 10))
 
-        # In the __init__ method where buttons are being created
-        self.start_button = self.ui.create_modern_button(self.buttons_frame, "Start", self.start_pomodoro)
-        self.pause_button = self.ui.create_modern_button(self.buttons_frame, "Pause", self.pause_pomodoro, state=tk.DISABLED)
-        self.reset_button = self.ui.create_modern_button(self.buttons_frame, "Reset", self.reset_pomodoro, state=tk.DISABLED)
-        self.break_button = self.ui.create_modern_button(self.buttons_frame, "Take a Break", self.start_break)
-        self.mute_button = self.ui.create_modern_button(self.buttons_frame, "Mute", self.toggle_mute)
-
-        # Adjust button packing to center them within the inner frame
-        self.start_button.pack(side=tk.LEFT, padx=5, expand=False)
-        self.pause_button.pack(side=tk.LEFT, padx=5, expand=False)
-        self.reset_button.pack(side=tk.LEFT, padx=5, expand=False)
-        self.break_button.pack(side=tk.LEFT, padx=5, expand=False)
-        self.mute_button.pack(side=tk.LEFT, padx=5, expand=False)
-
-        # Initialize progress bar
-        self.progress["maximum"] = self.focus_length
-        self.progress["value"] = 0
+    def set_api_key(self, api_key):
+        self.api_key_manager.set_api_key(api_key)
+        logger.info("API Key has been updated successfully.")
+    
+    def open_settings_window(self):
+        SettingsWindow(self.master, self)
 
     def create_button(self, master, text, command, button_key, state=tk.NORMAL):
         # Retrieve button color configuration using button_key
@@ -210,16 +269,6 @@ class PomodoroApp:
             self.progress["maximum"] = self.short_break
             self.progress["value"] = 0
 
-    def toggle_mute(self):
-        self.is_muted = not self.is_muted
-        # Update the button style using the new method from UIConfig
-        self.ui.update_mute_button_style(self.is_muted)
-        if self.is_muted:
-            self.mute_button.config(text="Unmute")
-        else:
-            self.mute_button.config(text="Mute")
-        print("Muted" if self.is_muted else "Unmuted")
-
     def update_focus_length(self, *args):
         self.focus_length = self.selected_focus_length.get() * 60
         self.progress["maximum"] = self.focus_length
@@ -251,132 +300,61 @@ class PomodoroApp:
 
         self.update_state_indicator("break")  # Update state indicator to yellow for break time
 
-    import random
-
-    def fetch_motivational_quote(self, for_break=False):
-        try:
-            themes = [
-                "perseverance",
-                "efficiency",
-                "teamwork",
-                "leadership",
-                "learning",
-                "growth",
-                "adaptability",
-                "focus",
-                "productivity",
-                "balance",
-                "well-being",
-                "mental clarity",
-                "optimism",
-                "resilience",
-                "innovation",
-                "success",
-                "energy",
-                "motivation",
-                "happiness",
-                "do what you love"
-            ]
-            theme = random.choice(themes)
-            if not for_break:
-                prompt = (
-                    f"Generate a motivational quote related to {theme} from a successful individual in the {self.profession} industry. This quote should inspire {self.user_name}, who is about to start a work session at {self.company}. "
-                    f"Begin the message with {self.user_name}'s name to grab their attention immediately. Follow with the quote and conclude with a brief, encouraging statement that incorporates humor and irony. "
-                    f"Design this message to be concise, engaging, and easily readable aloud by a voice assistant. The entire message should be a single, impactful paragraph that subtly blends humor/irony with motivation ,without directly attributing the quote to a specific person."
-                )
-            else:
-                activities = [
-                    "deep breathing",
-                    "quick stretches",
-                    "a short walk",
-                    "listening to music",
-                    "drinking a glass of water",
-                    "doing a few yoga poses",
-                    "meditating for a few minutes",
-                    "doodling or sketching",
-                    "reading a page of a book",
-                    "enjoying a healthy snack",
-                    "stepping outside for fresh air",
-                    "practicing a quick mindfulness exercise",
-                    "performing a brief body scan meditation",
-                    "writing down three things you're grateful for"
-                ]
-                activity = random.choice(activities)
-                prompt = (
-                    f"Compose a concise, unique, and creative short message for {self.user_name}, who has just finished a work session as a {self.profession} at {self.company}. "
-                    f"Suggest a simple 5 or 10 minute break activity like {activity}. "
-                    f"Keep the suggestion brief, easy to understand, and suitable for being read aloud by a voice assistant. "
-                    f"Focus on activities that are scientifically proven to reduce stress and enhance focus. "
-                    f"Add a touch of humor or irony to lighten the mood—because even serious break activities can have a fun side."
-                )
-
-            chat_completion = client.chat.completions.create(
-                messages=[
-                    {"role": "system", "content": f"You are a motivational AI assistant to a {self.profession} at {self.company} named {self.user_name}. Aim for uniqueness, creativity, humour, and scientific grounding in your messages. Your messages will be read out loud to the user to format them in a way that would be easy for an apple OS voice to say out loud. "},
-                    {"role": "user", "content": prompt}
-                ],
-                model="gpt-4-turbo",
-                temperature=0.8,  # Set the creativity/variability of the response
-                max_tokens=200,  # Limit the response length
-            )
-            message = chat_completion.choices[0].message.content.strip()
-            if for_break:
-                self.quote_var.set(f"Break Idea: {message}")
-            else:
-                self.quote_var.set(message)
-            
-            # Temporarily update that it's speaking
-            self.status_var.set("Speaking...")
-
-            # Start a new thread to speak the quote without blocking the GUI
-            speaking_thread = threading.Thread(target=self.speak_quote, args=(message,))
-            speaking_thread.start()
-            
-        except Exception as e:
-            self.quote_var.set("Failed to fetch idea. Check your internet connection.")
-            print(f"Error fetching idea: {e}")
-
-    def text_to_speech(self, text):
-        """Converts text to speech and saves as an MP3 file using the user's preferred voice."""
-        # Fetch the user's preferred voice setting from environment variables with 'onyx' as the default
-        user_voice = os.getenv("USER_VOICE", "onyx")
-        
-        # Define valid voice options for error checking
-        valid_voices = {"alloy", "echo", "fable", "onyx", "nova", "shimmer"}
-        
-        # Check if the provided voice setting is valid
-        if user_voice not in valid_voices:
-            print(f"Invalid voice setting '{user_voice}'. Using default 'onyx'.")
-            user_voice = "onyx"
-
-        try:
-            response = client.audio.speech.create(
-                model="tts-1",
-                voice=user_voice,
-                input=text,
-                response_format="opus"
-            )
-            response.stream_to_file(self.speech_file_path)
-            self.play_audio(self.speech_file_path)
-        except Exception as e:
-            print(f"Error in text-to-speech conversion: {e}")
-
-
     def play_audio(self, file_path):
         try:
             data, samplerate = sf.read(file_path, dtype='float32')
             sd.play(data, samplerate)
             sd.wait()  # Wait until the file has finished playing
+            logger.info("Audio playback completed.")
         except Exception as e:
-            print(f"Error playing audio file: {e}")
+            logger.error(f"Error playing audio file: {e}")
 
+    def fetch_motivational_quote(self, for_break=False):
+        if hasattr(self, 'ai_utils'):
+            try:
+                message = self.ai_utils.fetch_motivational_quote(for_break)
+                self.master.after(0, lambda: self.quote_var.set(message if not for_break else f"Break Idea: {message}"))
+                self.master.after(0, lambda: self.status_var.set("Speaking..."))
+                speaking_thread = threading.Thread(target=self.speak_quote, args=(message,))
+                speaking_thread.start()
+            except Exception as e:
+                self.quote_var.set("AI functionalities are not currently available due to missing or invalid API Key.")
+                logger.error(f"Error fetching idea: {e}")
+        else:
+            self.master.after(0, lambda: self.quote_var.set("AI functionalities are not available."))
+            logger.warning("AI Utils is not initialized or available.")
 
+    def text_to_speech(self, text):
+        """Converts text to speech and saves as an audio file using the user's preferred voice."""
+        user_voice = self.settings_manager.get_setting("AI_VOICE", "onyx")
+        valid_voices = {"alloy", "echo", "fable", "onyx", "nova", "shimmer"}
+
+        if user_voice not in valid_voices:
+            logger.error(f"Invalid voice setting '{user_voice}'. Using default 'onyx'.")
+            user_voice = "onyx"
+
+        script_dir = os.path.dirname(__file__)
+        speech_file_path = os.path.join(script_dir, 'speech_output.opus')
+
+        try:
+            response = self.client.audio.speech.create(
+                model="tts-1",
+                voice=user_voice,
+                input=text,
+                response_format="opus"
+            )
+            response.stream_to_file(speech_file_path)
+            self.play_audio(speech_file_path)  
+        except Exception as e:
+            logger.error(f"Error in text-to-speech conversion: {e}")
+            
     def speak_quote(self, message):
-        """Modified to use text_to_speech if not muted."""
         if not self.is_muted:
-            self.text_to_speech(message)
-        # Clears the "Speaking..." status and adjusts button states.
-        self.status_var.set("")
+            if hasattr(self, 'text_to_speech'):
+                self.text_to_speech(message)
+            else:
+                logger.warning("text_to_speech method is not available.")
+        self.master.after(0, lambda: self.status_var.set(""))
 
     def update_display(self, remaining_time):
         mins, secs = divmod(remaining_time, 60)
@@ -410,7 +388,7 @@ class PomodoroApp:
         self.update_state_indicator("paused")
         self.focus_dropdown.config(state="normal")
         self.break_dropdown.config(state="normal")
-        print("Timer paused.")
+        logger.info("Timer paused.")
 
     def reset_pomodoro(self):
         self.running = False
@@ -429,7 +407,7 @@ class PomodoroApp:
         self.update_state_indicator("default")
         self.work_sessions_completed = 0
         self.break_sessions_completed = 0
-        print("Timer reset.")
+        logger.info("Timer reset.")
 
     def pomodoro_timer(self):
         if self.remaining_time > 0 and self.running:
@@ -443,7 +421,7 @@ class PomodoroApp:
     def switch_mode(self):
         self.running = False  # Stop the current timer
         if self.is_focus_time:
-            self.play_sound(for_break=True)
+            play_sound(for_break=True)
             self.work_sessions_completed += 1
             if self.work_sessions_completed >= self.max_work_sessions:
                 self.reset_pomodoro()  # Reset if maximum work sessions are reached
@@ -454,7 +432,7 @@ class PomodoroApp:
             self.work_session_label.config(text=f"Work Sessions: {self.work_sessions_completed}/{self.max_work_sessions}")
             self.start_break()  # Start the break session
         else:
-            self.play_sound(for_break=False)
+            play_sound(for_break=False)
             self.break_sessions_completed += 1
             if self.break_sessions_completed >= self.max_break_sessions:
                 self.reset_pomodoro()  # Reset if maximum break sessions are reached
@@ -465,24 +443,28 @@ class PomodoroApp:
             self.break_session_label.config(text=f"Break Sessions: {self.break_sessions_completed}/{self.max_break_sessions}")
             self.start_pomodoro()  # Start the focus session
 
-    def play_sound(self, for_break=False):
-        if platform.system() == "Windows":
-            import winsound
-            if for_break:
-                winsound.Beep(440, 1000)  # Example frequency and duration for break
-            else:
-                winsound.Beep(550, 1000)  # Example frequency and duration for work
-        else:  # macOS and Linux
-            if for_break:
-                os.system('say -v Tessa "Break time."')
-            else:
-                os.system('say -v Tessa "Focus time."')
-
     def update_state_indicator(self, state):
         color = self.ui.colors["state_indicator"].get(state, self.ui.colors["state_indicator"]["default"])
         self.state_indicator_canvas.itemconfig(self.state_indicator, fill=color)
 
+    def handle_toggle_mute(self):
+        self.is_muted = toggle_mute(self.is_muted, self.ui.update_mute_button_style, self.mute_button)
+
+    def save_task(self):
+        # Retrieve text from the chat input
+        task_text = self.chat_input.get("1.0", tk.END).strip()
+        if task_text:
+            # Here you can add the code to save the task to a file or database
+            print("Task saved:", task_text)  # Example action: print the task to the console
+
+            # Clear the input field after saving
+            self.chat_input.delete("1.0", tk.END)
+        else:
+            print("No task to save")  # Optionally handle the case where no text was entered
+
+
 if __name__ == "__main__":
     root = tk.Tk()
+    root.title("Pomodoro AI")
     app = PomodoroApp(root)
     root.mainloop()

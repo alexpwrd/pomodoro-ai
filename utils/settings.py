@@ -1,0 +1,156 @@
+import tkinter as tk
+from tkinter import ttk, simpledialog
+from pathlib import Path
+from cryptography.fernet import Fernet
+import logging
+from utils.ui import UIConfig
+import json
+
+logger = logging.getLogger(__name__)
+
+class APIKeyManager:
+    def __init__(self, key_path="api_key.key", api_key_file='encrypted_api_key.bin'):
+        self.key_path = Path(key_path)
+        self.api_key_file = Path(api_key_file)  # Initialize the api_key_file attribute here
+        if not self.key_path.exists():
+            self.initialize_key()
+        self.cipher = Fernet(self.load_key())
+
+    def api_key_exists(self):
+        # Check if the encrypted API key file exists
+        return self.api_key_file.exists()
+
+    def initialize_key(self):
+        # Generate and save a new encryption key
+        key = Fernet.generate_key()
+        with self.key_path.open('wb') as key_file:
+            key_file.write(key)
+
+    def load_key(self):
+        return self.key_path.read_bytes()
+
+    def set_api_key(self, api_key):
+        encrypted_api_key = self.cipher.encrypt(api_key.encode())
+        with self.api_key_file.open('wb') as key_file:  # Use the Path object for consistency
+            key_file.write(encrypted_api_key)
+
+    def get_api_key(self):
+        try:
+            with self.api_key_file.open('rb') as key_file:  # Use the Path object for consistency
+                encrypted_api_key = key_file.read()
+            return self.cipher.decrypt(encrypted_api_key).decode()
+        except (FileNotFoundError, Exception) as e:
+            logger.error(f"Error accessing the API key: {e}")
+            return None
+class SettingsManager:
+    def __init__(self, settings_file='settings.json', callback=None):
+        self.settings_file = Path(settings_file)
+        self.settings = {}  # Initialize as an empty dictionary
+        self.load_settings()  # Load settings immediately upon initialization
+        self.callback = callback
+
+    def settings_exist(self):
+        return self.settings_file.exists()
+
+    def create_default_settings(self):
+        # Set the default settings and save them to the file
+        self.settings = self.default_settings()
+        self.save_settings()
+
+    def load_settings(self):
+        if not self.settings_file.exists():
+            logger.info("Settings file not found, creating default settings.")
+            self.create_default_settings()
+        try:
+            with self.settings_file.open('r') as file:
+                self.settings = json.load(file)
+                logger.info("Settings loaded successfully.")
+        except Exception as e:
+            logger.error(f"Failed to load settings, reverting to defaults: {e}")
+            self.create_default_settings()
+
+    def save_settings(self):
+        try:
+            with self.settings_file.open('w') as file:
+                json.dump(self.settings, file, indent=4)
+                logger.info("Settings saved successfully.")
+        except Exception as e:
+            logger.error(f"Failed to save settings: {e}")
+
+    def get_setting(self, key, default=None):
+        if self.settings is None:
+            logger.error("Settings not loaded or initialized correctly.")
+            return default
+        return self.settings.get(key, default)
+
+    def update_setting(self, key, value):
+        self.settings[key] = value
+        self.save_settings()
+
+    def default_settings(self):
+        return {
+            "USER_NAME": "Default User",
+            "PROFESSION": "Default Profession",
+            "COMPANY": "Default Company",
+            "AI_VOICE": "alloy"
+        }
+
+
+class SettingsWindow:
+    def __init__(self, master, app):
+        self.master = master
+        self.app = app
+        self.ui = app.ui  # Assume UIConfig is initialized in the main app class
+        self.window = tk.Toplevel(master)
+        self.create_widgets()
+        self.window.protocol("WM_DELETE_WINDOW", self.on_close)
+
+    def create_widgets(self):
+        # Configure the style for the frame to match the window background
+        style = ttk.Style()
+        style.configure("TFrame", background="#2D2D2D")  # Adjust the color to match your window's background
+        style.configure("TEntry", foreground="white", background="#2D2D2D", insertbackground="white")  # Set text color to white and background to match the frame
+        style.configure("TCombobox", fieldbackground="#2D2D2D", background="#2D2D2D", foreground="white", selectbackground="#2D2D2D", selectforeground="white")
+
+
+        frame = ttk.Frame(self.window, style="TFrame")
+        frame.pack(padx=30, pady=30)
+
+        settings = {
+            "User Name": "USER_NAME",
+            "Profession": "PROFESSION",
+            "Company": "COMPANY",
+            "AI Voice": "AI_VOICE",
+            "OpenAI API Key": "api_key"
+        }
+        self.entries = {}
+
+        for i, (label, setting_key) in enumerate(settings.items()):
+            label_widget = self.ui.create_label(frame, text=f"{label}:")
+            label_widget.grid(row=i, column=0, padx=10, pady=10)
+            current_value = self.app.settings_manager.get_setting(setting_key, "")
+            if setting_key == "AI_VOICE":
+                voice_combobox = ttk.Combobox(frame, values=["alloy", "echo", "fable", "onyx", "nova", "shimmer"], state="readonly")
+                voice_combobox.set(current_value)
+                voice_combobox.grid(row=i, column=1, padx=10, pady=10)
+                self.entries[setting_key] = voice_combobox
+            else:
+                entry_widget = self.ui.create_entry(frame)
+                entry_widget.insert(0, current_value)
+                entry_widget.grid(row=i, column=1, padx=10, pady=10)
+                self.entries[setting_key] = entry_widget
+
+        save_button = self.ui.create_modern_button(frame, text="Save", command=self.apply_and_save_settings)
+        save_button.grid(row=len(settings), column=0, columnspan=2, pady=20)
+
+    def apply_and_save_settings(self):
+        for key, entry in self.entries.items():
+            value = entry.get()
+            if key == "api_key":
+                self.app.api_key_manager.set_api_key(value)
+            else:
+                self.app.settings_manager.update_setting(key, value)
+        self.window.destroy()
+
+    def on_close(self):
+        self.window.destroy()

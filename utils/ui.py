@@ -1,10 +1,14 @@
+# ui.py is a module that contains the UIConfig class which is responsible for configuring the styles of the UI elements
+
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, PhotoImage
 
 class UIConfig:
     def __init__(self):
         self.colors = {
             "background": '#2D2D2D',
+            "foreground": "#FFFFFF",  # Ensure this line exists
+            "sidebar_bg": '#1E1E1E',  # Darker for sidebar
             "text": '#F0F0F0',
             "progress_bar": '#505050',
             "button": {
@@ -115,12 +119,12 @@ class UIConfig:
         label = ttk.Label(master, text=text, style="TLabel")
         return label
 
-    def create_entry(self, master, textvariable=None, placeholder=None):
-        entry = ttk.Entry(master, textvariable=textvariable, style="TEntry")
+    def create_entry(self, master, textvariable=None, placeholder=None, **options):
+        entry = ttk.Entry(master, textvariable=textvariable, style="TEntry", **options)
         if placeholder:
             entry.insert(0, placeholder)
-            entry.bind("<FocusIn>", lambda event: entry.delete(0, tk.END) if entry.get() == placeholder else None)
-            entry.bind("<FocusOut>", lambda event: entry.insert(0, placeholder) if not entry.get() else None)
+            entry.bind("<FocusIn>", lambda event, e=entry: e.delete(0, tk.END) if e.get() == placeholder else None)
+            entry.bind("<FocusOut>", lambda event, e=entry: e.insert(0, placeholder) if not e.get() else None)
         return entry
 
     def create_option_menu(self, master, variable, options, command=None):
@@ -128,3 +132,5 @@ class UIConfig:
         option_menu.config(bg=self.colors["background"], fg=self.colors["text"], font=self.global_font)
         option_menu["menu"].config(bg=self.colors["background"], fg=self.colors["text"])
         return option_menu
+    
+

@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=42", "wheel", "py2app"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pomodoro-ai"
+version = "0.1.0"
+description = "A Pomodoro timer with AI features."
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+authors = [
+    {name = "Alex G", email = "alex@pwrd.ai"}
+]
+keywords = ["pomodoro", "productivity", "time management", "AI"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Software Development :: Build Tools"
+]
+dependencies = [
+    "numpy",
+    "sounddevice",
+    "soundfile",
+    "openai",
+    "cryptography"
+]
+
+[project.urls]
+homepage = "http://pwrd.ai"
+documentation = "http://pwrd.ai/docs"
+repository = "http://example.com/repo"
+
+[tool.py2app]
+argv-emulation = true
+packages = ["numpy", "sounddevice", "soundfile", "openai", "cryptography"]
+includes = ["numpy", "sounddevice", "soundfile", "openai", "cryptography"]
+iconfile = "tomato_icon.icns"
+
+[tool.py2app.plist]
+CFBundleName = "Pomodoro AI"
+CFBundleDisplayName = "Pomodoro AI"
+CFBundleVersion = "0.1.0"
+CFBundleShortVersionString = "0.1.0"
