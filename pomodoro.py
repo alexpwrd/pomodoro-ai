@@ -206,7 +206,6 @@ class PomodoroApp:
         self.quote_display = tk.Label(self.master, textvariable=self.quote_var, font=("Helvetica", 14), wraplength=400, bg=self.ui.colors["background"], fg=self.ui.colors["text"])
         self.quote_display.pack(pady=(10, 20))
 
-
         # Main Task Frame
         self.task_frame = tk.Frame(self.master, bg=self.ui.colors["background"])
         self.task_frame.pack(side=tk.BOTTOM, fill=tk.X, expand=True, padx=10, pady=10)
@@ -358,11 +357,15 @@ class PomodoroApp:
             self.running = False
             self.is_focus_time = False
         
+        # Collect current tasks
+        current_tasks = [task_label.cget("text") for task_frame in self.todo_frame.winfo_children() for task_label in task_frame.winfo_children() if isinstance(task_label, tk.Label)]
+        current_todo = ', '.join(current_tasks)
+
         # Now start the break.
         self.running = True
         self.remaining_time = self.short_break
         self.update_display(self.remaining_time)
-        self.fetch_motivational_quote(for_break=True)
+        self.fetch_motivational_quote(for_break=True, current_todo=current_todo)  # Pass current_todo here
         self.progress["maximum"] = self.short_break
         self.progress["value"] = 0
         self.pomodoro_timer()
@@ -384,11 +387,11 @@ class PomodoroApp:
         except Exception as e:
             logger.error(f"Error playing audio file: {e}")
 
-    def fetch_motivational_quote(self, for_break=False):
+    def fetch_motivational_quote(self, for_break=False, current_todo=""):
         if hasattr(self, 'ai_utils'):
             try:
-                message = self.ai_utils.fetch_motivational_quote(for_break)
-                self.master.after(0, lambda: self.quote_var.set(message if not for_break else f"Break Idea: {message}"))
+                message = self.ai_utils.fetch_motivational_quote(for_break, current_todo)
+                self.master.after(0, lambda: self.quote_var.set(message if not for_break else f"Break Time: {message}"))
                 self.master.after(0, lambda: self.status_var.set("Speaking..."))
                 speaking_thread = threading.Thread(target=self.speak_quote, args=(message,))
                 speaking_thread.start()
@@ -444,14 +447,20 @@ class PomodoroApp:
             self.break_button.config(state=tk.DISABLED)
             self.focus_dropdown.config(state="disabled")
             self.break_dropdown.config(state="disabled")
+
+            # Retrieve all tasks from the todo_frame
+            current_tasks = [task_label.cget("text") for task_frame in self.todo_frame.winfo_children() for task_label in task_frame.winfo_children() if isinstance(task_label, tk.Label)]
+            current_todo = ', '.join(current_tasks)  # Combine all tasks into a single string
+
             if not self.is_resuming:
-                threading.Thread(target=self.fetch_motivational_quote).start()  # Run this in a separate thread
+                threading.Thread(target=self.fetch_motivational_quote, args=(False, current_todo)).start()
             else:
                 self.is_resuming = False
             self.progress["maximum"] = self.focus_length
             self.progress["value"] = 0
             self.pomodoro_timer()
             self.update_state_indicator("focus")
+
 
     def pause_pomodoro(self):
         self.running = False

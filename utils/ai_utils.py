@@ -9,7 +9,7 @@ class AIUtils:
         self.profession = profession
         self.company = company
 
-    def fetch_motivational_quote(self, for_break=False):
+    def fetch_motivational_quote(self, for_break=False, current_todo=""):
         themes = [
             "perseverance",
             "efficiency",
@@ -36,7 +36,8 @@ class AIUtils:
         if not for_break:
             prompt = (
                 f"Generate a motivational quote related to {theme} from a successful individual in the {self.profession} industry. This quote should inspire {self.user_name}, who is about to start a work session at {self.company}. "
-                f"Begin the message with {self.user_name}'s name to grab their attention immediately. Follow with the quote and conclude with a brief, encouraging statement that incorporates humor and irony. No coffee references. "
+                f"The user is working on the following task(s) during this work session:'{current_todo}'. " 
+                f"Begin the message with {self.user_name}'s name to grab their attention immediately. Follow with the quote and conclude with a brief reminder of their task and encouraging statement that incorporates humor and irony. No coffee references. "
                 f"Design this message to be concise, engaging, and easily readable aloud by a voice assistant. The entire message should be a single, impactful paragraph that subtly blends humor/irony with motivation, without directly attributing the quote to a specific person."
             )
         else:
@@ -58,8 +59,8 @@ class AIUtils:
             ]
             activity = random.choice(activities)
             prompt = (
-                f"Compose a concise, unique, and creative short message for {self.user_name}, who has just finished a work session as a {self.profession} at {self.company}. "
-                f"Suggest a simple 5 or 10 minute break activity like {activity}. "
+                f"Compose a concise, unique, and creative short message for {self.user_name}, who has just finished a work session as a {self.profession} at {self.company} working on: '{current_todo}'. "
+                f"Mention the task(s) they are working on and suggest a simple 5 or 10 minute break activity like {activity}. "
                 f"Keep the suggestion brief, easy to understand, and suitable for being read aloud by a voice assistant. "
                 f"Focus on activities that are scientifically proven to reduce stress and enhance focus. "
                 f"Add a touch of humor or irony to lighten the mood—because even serious break activities can have a fun side."
