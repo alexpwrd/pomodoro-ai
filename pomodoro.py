@@ -206,28 +206,96 @@ class PomodoroApp:
         self.quote_display = tk.Label(self.master, textvariable=self.quote_var, font=("Helvetica", 14), wraplength=400, bg=self.ui.colors["background"], fg=self.ui.colors["text"])
         self.quote_display.pack(pady=(10, 20))
 
-        # Frame for chat window and instructions
-        self.chat_frame = tk.Frame(self.master, bg=self.ui.colors["background"])
-        self.chat_frame.pack(pady=(20, 10), padx=10, fill=tk.X)  # Use fill=tk.X to keep it centered and expand horizontally
 
-        # Instruction label for chat input
-        self.chat_instruction_label = tk.Label(self.chat_frame, text="Write down up to 3 tasks and save:", bg=self.ui.colors["background"], fg=self.ui.colors["text"])
-        self.chat_instruction_label.pack(pady=(0, 5))
+        # Main Task Frame
+        self.task_frame = tk.Frame(self.master, bg=self.ui.colors["background"])
+        self.task_frame.pack(side=tk.BOTTOM, fill=tk.X, expand=True, padx=10, pady=10)
 
-        # Chat input text box
-        self.chat_input = tk.Text(self.chat_frame, height=3, width=50, bg=self.ui.colors["entry"]["field_bg"], fg=self.ui.colors["text"])
-        self.chat_input.pack(side=tk.LEFT, padx=(10, 0), pady=(0, 10), expand=True, fill=tk.X)  # Expanded to fill the frame horizontally
+        # Task Input Frame
+        self.task_input_frame = tk.Frame(self.task_frame, bg=self.ui.colors["background"])
+        self.task_input_frame.pack(fill=tk.X, padx=10, pady=(5, 10))
 
-        # Save Task button
-        self.chat_submit_button = self.ui.create_modern_button(self.chat_frame, "Save Tasks", self.save_task, style='Modern.TButton')
-        self.chat_submit_button.pack(side=tk.RIGHT, padx=(10, 0), pady=(0, 10))
+        # Task Input Field
+        self.task_input = tk.Entry(self.task_input_frame, width=50)
+        self.task_input.pack(side=tk.LEFT, padx=(10, 0), pady=(0, 10), expand=True)
 
-    def set_api_key(self, api_key):
-        self.api_key_manager.set_api_key(api_key)
-        logger.info("API Key has been updated successfully.")
+        # Add Task Button
+        self.add_task_button = tk.Button(self.task_input_frame, text="Add Task", command=self.add_task)
+        self.add_task_button.pack(side=tk.RIGHT, padx=(0, 10), pady=(0, 10))
+
+        # Task Display Frame
+        self.tasks_display_frame = tk.Frame(self.task_frame, bg=self.ui.colors["background"])
+        self.tasks_display_frame.pack(fill=tk.X, expand=True)
+
+        # To Do Column Setup
+        todo_column_frame = tk.Frame(self.tasks_display_frame, bg=self.ui.colors["todo_bg"])
+        todo_column_frame.pack(side=tk.LEFT, fill=tk.Y, expand=True, padx=(10, 5), pady=5)
+        todo_label = tk.Label(todo_column_frame, text="To Do:", bg=self.ui.colors["todo_bg"], fg="lightgrey", font=("Helvetica", 16, "bold"))
+        todo_label.pack(side=tk.TOP, fill=tk.X)
+        self.todo_frame = tk.Frame(todo_column_frame, bg=self.ui.colors["todo_bg"])
+        self.todo_frame.pack(side=tk.TOP, fill=tk.X, expand=True)
+
+        # Completed Column Setup
+        completed_column_frame = tk.Frame(self.tasks_display_frame, bg=self.ui.colors["background"])
+        completed_column_frame.pack(side=tk.RIGHT, fill=tk.Y, expand=True, padx=(5, 10), pady=5)
+
+        # Completed Label and Clear All Button
+        completed_label_frame = tk.Frame(completed_column_frame, bg=self.ui.colors["background"])
+        completed_label_frame.pack(side=tk.TOP, fill=tk.X)
+
+        completed_label = tk.Label(completed_label_frame, text="Completed", bg=self.ui.colors["background"], fg="lightgrey", font=("Helvetica", 16, "bold"))
+        completed_label.pack(side=tk.LEFT)
+
+        # Clear All Button for Completed Tasks
+        clear_all_button = tk.Button(completed_label_frame, text="\u2672", command=self.clear_completed_tasks, fg="#2B2B2B", bg="#2D2D2D")
+        clear_all_button.pack(side=tk.RIGHT, padx=10)
+
+        self.completed_frame = tk.Frame(completed_column_frame, bg=self.ui.colors["completed_bg"])
+        self.completed_frame.pack(side=tk.TOP, fill=tk.X, expand=True)
+
+
+    def add_task(self):
+        task_text = self.task_input.get().strip()
+        if task_text:
+            task_frame = tk.Frame(self.todo_frame, bg=self.ui.colors["background"], borderwidth=0, highlightthickness=0)
+            task_frame.pack(pady=2, padx=10, fill=tk.X)
+
+            # Task label
+            task_label = tk.Label(task_frame, text=task_text, font=("Helvetica", 16), bg=self.ui.colors["background"], fg=self.ui.colors["text"])
+            task_label.pack(side=tk.LEFT, fill=tk.X, expand=True)
+
+            # Complete task button
+            complete_button = self.create_button(task_frame, "✔", lambda: self.complete_task(task_label, task_frame), "button")
+            complete_button.pack(side=tk.RIGHT, padx=(0, 5))
+
+            # Delete task button
+            delete_button = self.create_button(task_frame, "✖", lambda: task_frame.destroy(), "button")
+            delete_button.pack(side=tk.RIGHT)
+
+            self.task_input.delete(0, tk.END)
+        else:
+            messagebox.showerror("Error", "No task to add")
+
+    def complete_task(self, task_label, task_frame):
+        # Disable the task label and change its color to indicate completion
+        task_label.config(fg="gray")
+
+        # Create a new frame in the completed tasks area with matching background color
+        completed_task_frame = tk.Frame(self.completed_frame, bg=self.ui.colors["background"], borderwidth=0, highlightthickness=0)
+        completed_task_frame.pack(pady=2, padx=10, fill=tk.X)
+
+        # Recreate the label in the new frame with a suitable color to indicate completion
+        completed_task_label = tk.Label(completed_task_frame, text=task_label.cget("text"), font=("Helvetica", 16), fg="green", bg=self.ui.colors["background"])
+        completed_task_label.pack(side=tk.LEFT, fill=tk.X, expand=True)
+
+        # Destroy the old frame in the To Do section
+        task_frame.destroy()
     
-    def open_settings_window(self):
-        SettingsWindow(self.master, self)
+    def clear_completed_tasks(self):
+    # This method will destroy all child widgets in the completed_frame,
+    # effectively clearing all completed tasks.
+        for widget in self.completed_frame.winfo_children():
+            widget.destroy()
 
     def create_button(self, master, text, command, button_key, state=tk.NORMAL):
         # Retrieve button color configuration using button_key
@@ -238,10 +306,10 @@ class PomodoroApp:
 
         # Configure the style for this button
         button_style = ttk.Style()
-        button_style.configure(style_name, background=button_colors['bg'], foreground=button_colors['fg'])
+        button_style.configure(style_name, background=button_colors['bg'], foreground=button_colors['fg'], relief='flat', borderwidth=0, padding=1)
 
         # Create a button with the specific style
-        button = ttk.Button(master, text=text, command=command, style=style_name)
+        button = ttk.Button(master, text=text, command=command, style=style_name, width=2)  # width set to 2 to make it square
         button.state(["!disabled"])  # Ensure it starts in enabled state unless specified
 
         # Change the state based on the 'state' parameter
@@ -261,6 +329,13 @@ class PomodoroApp:
 
         return button
     
+    def set_api_key(self, api_key):
+        self.api_key_manager.set_api_key(api_key)
+        logger.info("API Key has been updated successfully.")
+    
+    def open_settings_window(self):
+        SettingsWindow(self.master, self)
+
     def update_break_length(self, *args):
         self.short_break = self.selected_break_length.get() * 60  # Convert minutes to seconds
         if not self.is_focus_time:  # If currently in break, update the timer display and progress bar maximum
@@ -449,19 +524,6 @@ class PomodoroApp:
 
     def handle_toggle_mute(self):
         self.is_muted = toggle_mute(self.is_muted, self.ui.update_mute_button_style, self.mute_button)
-
-    def save_task(self):
-        # Retrieve text from the chat input
-        task_text = self.chat_input.get("1.0", tk.END).strip()
-        if task_text:
-            # Here you can add the code to save the task to a file or database
-            print("Task saved:", task_text)  # Example action: print the task to the console
-
-            # Clear the input field after saving
-            self.chat_input.delete("1.0", tk.END)
-        else:
-            print("No task to save")  # Optionally handle the case where no text was entered
-
 
 if __name__ == "__main__":
     root = tk.Tk()

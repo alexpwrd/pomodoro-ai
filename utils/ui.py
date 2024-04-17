@@ -6,23 +6,23 @@ from tkinter import ttk, PhotoImage
 class UIConfig:
     def __init__(self):
         self.colors = {
-            "background": '#2D2D2D',
-            "foreground": "#FFFFFF",  # Ensure this line exists
-            "sidebar_bg": '#1E1E1E',  # Darker for sidebar
-            "text": '#F0F0F0',
-            "progress_bar": '#505050',
+            "background": '#333333',  # Dark grey background
+            "foreground": "#FFFFFF",  # White text
+            "sidebar_bg": '#2D2D2D',  # Slightly darker grey for sidebar
+            "text": '#FFFFFF',  # White text for better readability
+            "progress_bar": '#4CAF50',  # Green progress bar
             "button": {
-                'bg': '#505050',
-                'fg': '#F0F0F0',
-                'hover_bg': '#686868',
+                'bg': '#595959',  #  buttons
+                'fg': '#FFFFFF',  # White text on buttons
+                'hover_bg': '#404040',  # Slightly darker  hover
                 'hover_fg': '#FFFFFF',
-                'disabled_bg': '#3A3A3A',
-                'disabled_fg': '#A6A6A6'
+                'disabled_bg': '#9E9E9E',  # Greyed out for disabled
+                'disabled_fg': '#CFD8DC'
             },
             "entry": {
                 "bg": '#FFFFFF',
-                "fg": '#000000',
-                "field_bg": '#333333'
+                "fg": '#333333',
+                "field_bg": '#BBBBBB'  # Light grey for input fields
             },
             "mute_button": {  # Specific style for mute button
                 'bg': '#BDBDBD',
@@ -36,8 +36,10 @@ class UIConfig:
                 "focus": '#4CAF50',  # Green
                 "break": '#FFEB3B',  # Yellow
                 "paused": '#FFC107',  # Amber
-                "default": '#9E9E9E'  # Grey
-            }
+                "default": '#BDBDBD'  # Neutral grey
+            },
+            "todo_bg": '#333333',  # Background for todo tasks
+            "completed_bg": '#333333'  # Background for completed tasks
         }
         self.configure_styles()
 
@@ -71,14 +73,21 @@ class UIConfig:
         )
 
         # Configure mute button specific style
-        style.configure("MuteButton.TButton",
-                        background=self.colors['mute_button']['bg'],
-                        foreground=self.colors['mute_button']['fg'])
-        style.map("MuteButton.TButton",
-                  background=[('active', self.colors['mute_button']['hover_bg']),
-                              ('disabled', self.colors['mute_button']['disabled_bg'])],
-                  foreground=[('active', self.colors['mute_button']['hover_fg']),
-                              ('disabled', self.colors['mute_button']['disabled_fg'])])
+        style.configure(
+            "MuteButton.TButton",
+            font=self.global_font,
+            background=self.colors['mute_button']['bg'],
+            foreground=self.colors['mute_button']['fg'],
+            borderwidth=0,
+            highlightthickness=0,
+            padding=5,
+            relief='flat'
+        )
+        style.map(
+            "MuteButton.TButton",
+            background=[('active', self.colors['mute_button']['hover_bg']), ('disabled', self.colors['mute_button']['disabled_bg'])],
+            foreground=[('active', self.colors['mute_button']['hover_fg']), ('disabled', self.colors['mute_button']['disabled_fg'])]
+        )
 
         # Configure label and entry styles
         style.configure(
@@ -95,6 +104,7 @@ class UIConfig:
             borderwidth=0,
             font=self.global_font
         )
+
 
     def update_mute_button_style(self, muted):
         """ Update the style for the mute button based on the muted state. """

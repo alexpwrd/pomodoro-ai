@@ -1,5 +1,33 @@
+# Python files
 *.pyc
 __pycache__/
+
+# Environment files
 .env
+environment.yml  # Exclude environment configuration
+
+# Package and dependency files
+pyproject.toml  # Exclude build system configuration
+new_requirements.txt  # Exclude alternative requirements file
+requirements.txt  # Exclude main requirements file
+
+# Audio files
 .mp3
 .opus
+speech_output.opus
+
+# Sensitive files
+api_key.key
+encrypted_api_key.bin
+settings.json
+
+# Icon files (if not needed in the repo)
+tomato_icon.icns
+tomato_icon.iconset/
+tomato_icon.png
+
+# Ignore specific directories
+utils/__pycache__/
+
+# Setup files
+setup.py  # Exclude setup script
