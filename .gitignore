@@ -21,11 +21,6 @@ api_key.key
 encrypted_api_key.bin
 settings.json
 
-# Icon files (if not needed in the repo)
-tomato_icon.icns
-tomato_icon.iconset/
-tomato_icon.png
-
 # Ignore specific directories
 utils/__pycache__/
 

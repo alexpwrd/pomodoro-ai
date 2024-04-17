@@ -77,12 +77,14 @@ class PomodoroApp:
 
     def load_api_settings(self):
         self.openai_api_key = self.api_key_manager.get_api_key()
-        self.client = OpenAI(api_key=self.openai_api_key) if self.openai_api_key else None
-        if self.client:
+        if self.openai_api_key:
+            self.client = OpenAI(api_key=self.openai_api_key)
             self.ai_utils = AIUtils(self.client, self.user_name, self.profession, self.company)
         else:
-            logger.error("API Key is not set or invalid. AI functionalities will be limited.")
+            self.client = None
             self.ai_utils = None
+            logger.info("API Key is not set. Please set your API key for full functionality.")
+            self.prompt_for_api_key()  # Optionally prompt for API key at startup
 
     def load_user_settings(self):
         self.user_name = self.settings_manager.get_setting("USER_NAME", "Default User")
@@ -111,12 +113,16 @@ class PomodoroApp:
         self.current_cycle = 0  
 
     def setup_window_layout(self):
-        set_window_icon(self.master, 'tomato_icon.png')
+        try:
+            # Assuming set_window_icon has been updated to correctly reference the resources folder
+            set_window_icon(self.master, 'tomato_icon.png')
+        except Exception as e:
+            logger.error(f"Failed to set window icon: {e}")
         self.master.configure(bg=self.ui.colors["background"])
         window_width, window_height = 900, 600
         screen_width, screen_height = self.master.winfo_screenwidth(), self.master.winfo_screenheight()
-        x = int((screen_width / 2) - (window_width / 2))  # Convert to int
-        y = 0  # Keep y as an integer
+        x = int((screen_width / 2) - (window_width / 2))  # Center the window horizontally
+        y = 0  # Position the window at the top of the screen
         self.master.geometry(f'{window_width}x{window_height}+{x}+{y}')
 
     def setup_sidebar(self):
