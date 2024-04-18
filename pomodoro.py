@@ -40,6 +40,8 @@ class PomodoroApp:
         self.setup_sidebar()
         self.initialize_ui_elements()
 
+        self.work_cycles_completed = int(self.settings_manager.get_setting("WORK_CYCLES_COMPLETED", 0))
+
         if self.client is not None:
             self.ai_utils = AIUtils(self.client, self.user_name, self.profession)
         else:
@@ -101,8 +103,8 @@ class PomodoroApp:
             logger.info("API Key is not set. Please set your API key for full functionality.")
 
     def initialize_timing(self):
-        self.focus_options = [1, 15, 25, 50, 90]  # in minutes
-        self.break_options = [1, 5, 10, 15]  # in minutes
+        self.focus_options = [15, 25, 50, 90]  # in minutes
+        self.break_options = [5, 10, 15]  # in minutes
         # Use settings for default values
         focus_length = self.settings_manager.get_setting("FOCUS_TIME", 25)
         break_length = self.settings_manager.get_setting("BREAK_TIME", 5)
@@ -122,6 +124,7 @@ class PomodoroApp:
         self.work_sessions_completed = 0  
         self.break_sessions_completed = 0  
         self.current_cycle = 0  
+        self.work_cycles_completed = int(self.settings_manager.get_setting("WORK_CYCLES_COMPLETED", 0))
 
     def setup_window_layout(self):
         try:
@@ -130,7 +133,8 @@ class PomodoroApp:
         except Exception as e:
             logger.error(f"Failed to set window icon: {e}")
         self.master.configure(bg=self.ui.colors["background"])
-        window_width, window_height = 900, 600
+        window_width, window_height = 800, 500
+        
         screen_width, screen_height = self.master.winfo_screenwidth(), self.master.winfo_screenheight()
         x = int((screen_width / 2) - (window_width / 2))  # Center the window horizontally
         y = 0  # Position the window at the top of the screen
@@ -163,10 +167,12 @@ class PomodoroApp:
         # Session statistics
         session_stats_frame = tk.Frame(self.sidebar, bg=self.ui.colors['sidebar_bg'])
         session_stats_frame.pack(pady=10, fill='x')
-        self.work_session_label = tk.Label(session_stats_frame, text=f"Work: {self.work_sessions_completed}/{self.max_work_sessions}", bg=self.ui.colors['sidebar_bg'], fg=self.ui.colors['text'])
+        self.work_session_label = tk.Label(session_stats_frame, text=f"Work Sessions: {self.work_sessions_completed}/{self.max_work_sessions}", bg=self.ui.colors['sidebar_bg'], fg=self.ui.colors['text'])
         self.work_session_label.pack(side='top')
         self.break_session_label = tk.Label(session_stats_frame, text=f"Breaks: {self.break_sessions_completed}/{self.max_break_sessions}", bg=self.ui.colors['sidebar_bg'], fg=self.ui.colors['text'])
         self.break_session_label.pack(side='top')
+        self.work_cycles_label = tk.Label(self.sidebar, text=f"Work Cycles: {self.work_cycles_completed}", bg=self.ui.colors['sidebar_bg'], fg=self.ui.colors['text'])
+        self.work_cycles_label.pack(side='top')
 
         # Bottom control buttons frame for Mute, Reset, and Settings
         bottom_buttons_frame = tk.Frame(self.sidebar, bg=self.ui.colors["sidebar_bg"])
@@ -201,7 +207,8 @@ class PomodoroApp:
         self.state_indicator = self.state_indicator_canvas.create_oval(circle_x0, circle_y0, circle_x1, circle_y1, fill=self.ui.colors["state_indicator"]["default"])
 
         # Timer Display
-        self.time_var = tk.StringVar(self.master, value="25:00")
+        self.time_var = tk.StringVar(self.master)
+        self.update_display(self.focus_length)  # Convert minutes to seconds correctly here
         self.timer_display = tk.Label(self.center_frame, textvariable=self.time_var, font=("Helvetica", 48), bg=self.ui.colors["background"], fg=self.ui.colors["text"])
         self.timer_display.pack(side=tk.LEFT, padx=(10,0))
 
@@ -212,19 +219,7 @@ class PomodoroApp:
 
         # Main Task Frame
         self.task_frame = tk.Frame(self.master, bg=self.ui.colors["background"])
-        self.task_frame.pack(side=tk.BOTTOM, fill=tk.X, expand=True, padx=10, pady=10)
-
-        # Task Input Frame
-        self.task_input_frame = tk.Frame(self.task_frame, bg=self.ui.colors["background"])
-        self.task_input_frame.pack(fill=tk.X, padx=10, pady=(5, 10))
-
-        # Task Input Field
-        self.task_input = tk.Entry(self.task_input_frame, width=50)
-        self.task_input.pack(side=tk.LEFT, padx=(10, 0), pady=(0, 10), expand=True)
-
-        # Add Task Button
-        self.add_task_button = tk.Button(self.task_input_frame, text="Add Task", command=self.add_task)
-        self.add_task_button.pack(side=tk.RIGHT, padx=(0, 10), pady=(0, 10))
+        self.task_frame.pack(fill=tk.X, expand=True, padx=10, pady=10)
 
         # Task Display Frame
         self.tasks_display_frame = tk.Frame(self.task_frame, bg=self.ui.colors["background"])
@@ -253,9 +248,24 @@ class PomodoroApp:
         clear_all_button = tk.Button(completed_label_frame, text="\u2672", command=self.clear_completed_tasks, fg="#2B2B2B", bg="#2D2D2D")
         clear_all_button.pack(side=tk.RIGHT, padx=10)
 
+        # Create a frame to display completed tasks within the completed column frame.
+        # The background color is set to the 'completed_bg' color from the UI configuration.
         self.completed_frame = tk.Frame(completed_column_frame, bg=self.ui.colors["completed_bg"])
+        # Pack the completed frame at the top of its parent frame, allow it to fill horizontally,
+        # and enable expansion to use any extra space.
         self.completed_frame.pack(side=tk.TOP, fill=tk.X, expand=True)
 
+        # New Task Input Frame pinned to the bottom
+        task_input_frame = tk.Frame(self.master, bg=self.ui.colors["background"])
+        task_input_frame.pack(side=tk.BOTTOM, fill=tk.X, padx=10, pady=(5, 10))
+
+        # Task Input Field with specific style
+        self.task_input = self.ui.create_entry(task_input_frame, style="TaskInput.TEntry", width=40)
+        self.task_input.pack(side=tk.LEFT, padx=(10, 10), pady=(0, 10), expand=True, fill=tk.X)  # Added horizontal padding on the right
+
+        # Add Task Button using the modern button style
+        self.add_task_button = self.ui.create_modern_button(task_input_frame, "Add Task", self.add_task)
+        self.add_task_button.pack(side=tk.RIGHT, padx=(10, 10), pady=(0, 10))  # Added horizontal padding on the left
 
     def add_task(self):
         task_text = self.task_input.get().strip()
@@ -382,6 +392,9 @@ class PomodoroApp:
             # Start the pomodoro timer for the new focus session
             self.start_pomodoro()
 
+            # Ensure the skip button is disabled when starting a new focus session
+            self.skip_button.config(state=tk.DISABLED)
+
     def start_break(self):
         # Stop any ongoing work session before starting the break.
         if self.running and self.is_focus_time:
@@ -472,9 +485,10 @@ class PomodoroApp:
                 logger.warning("text_to_speech method is not available.")
         self.master.after(0, lambda: self.status_var.set(""))
 
-    def update_display(self, remaining_time):
-        mins, secs = divmod(remaining_time, 60)
-        self.time_var.set(f"{mins:02d}:{secs:02d}")
+    def update_display(self, seconds):
+        minutes = seconds // 60
+        seconds = seconds % 60
+        self.time_var.set(f"{minutes:02}:{seconds:02}")
 
     def update_timer_settings(self):
         # Fetch new settings
@@ -557,6 +571,11 @@ class PomodoroApp:
             play_sound(for_break=True)
             self.work_sessions_completed += 1
             if self.work_sessions_completed >= self.max_work_sessions:
+                self.work_sessions_completed = 0  # Reset work sessions
+                self.work_cycles_completed += 1  # Increment work cycles counter
+                self.settings_manager.update_setting("WORK_CYCLES_COMPLETED", self.work_cycles_completed)  # Save the new counter
+                self.settings_manager.save_settings()  # Make sure to save settings to file
+                self.update_work_cycles_display()  # Update UI with the new work cycles count
                 self.reset_pomodoro()  # Reset if maximum work sessions are reached
                 return
             self.is_focus_time = False
@@ -590,6 +609,10 @@ class PomodoroApp:
             self.mute_button.config(text="Mute")
         # Update the mute button style based on the new mute state
         self.ui.update_mute_button_style(self.is_muted)
+
+    def update_work_cycles_display(self):
+        # Assuming you have a label for displaying work cycles, similar to work_session_label
+        self.work_cycles_label.config(text=f"Work Cycles: {self.work_cycles_completed}")
 
 if __name__ == "__main__":
     root = tk.Tk()

@@ -12,7 +12,6 @@ class AIUtils:
         themes = [
             "perseverance",
             "efficiency",
-            "teamwork",
             "leadership",
             "learning",
             "growth",

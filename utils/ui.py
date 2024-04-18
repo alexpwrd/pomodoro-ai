@@ -47,7 +47,7 @@ class UIConfig:
     def configure_styles(self):
         style = ttk.Style()
         style.theme_use('default')
-        self.global_font = ("Helvetica", 15)
+        self.global_font = ("Helvetica", 15)  # Setting the global font size to 15
 
         # Configure frame style
         style.configure("TFrame", background=self.colors["background"])
@@ -57,7 +57,7 @@ class UIConfig:
                         fieldbackground='#2D2D2D',  #  input fields
                         background=self.colors["entry"]["bg"],  # White background (general background, not as critical)
                         foreground='#FFFFFF',  # for contrast
-                        font=("Helvetica", 15, "bold")) 
+                        font=self.global_font)  # Apply the global font with size 15
 
         # Configure combobox style
         style.configure("TCombobox", 
@@ -76,7 +76,7 @@ class UIConfig:
         # Additional configuration for the dropdown list items
         style.configure("TCombobox.Listbox",
                         background='#2D2D2D',  # Almost black for dropdown list background
-                        foreground='#FFFFFF',  # dropdown list items
+                                        foreground='#FFFFFF',  # dropdown list items
                         font=self.global_font)
         
         
@@ -154,7 +154,7 @@ class UIConfig:
         return label
 
     def create_entry(self, master, textvariable=None, placeholder=None, **options):
-        entry = ttk.Entry(master, textvariable=textvariable, style="TEntry", **options)
+        entry = ttk.Entry(master, textvariable=textvariable, **options)
         if placeholder:
             entry.insert(0, placeholder)
             entry.bind("<FocusIn>", lambda event, e=entry: e.delete(0, tk.END) if e.get() == placeholder else None)

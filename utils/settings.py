@@ -116,11 +116,12 @@ class SettingsManager:
 
     def default_settings(self):
         return {
-            "USER_NAME": "Default User",
-            "PROFESSION": "Default Profession",
+            "USER_NAME": "Name",
+            "PROFESSION": "Profession",
             "AI_VOICE": "alloy",
-            "FOCUS_TIME": 25,  # Default focus time in minutes
-            "BREAK_TIME": 5,  # Default break time in minutes
+            "FOCUS_TIME": 25,  
+            "BREAK_TIME": 5,  
+            "WORK_CYCLES_COMPLETED": 0, 
         }
 
 
@@ -142,8 +143,8 @@ class SettingsWindow:
             "Profession": "PROFESSION",
             "AI Voice": "AI_VOICE",
             "OpenAI API Key": "api_key",
-            "Focus Time (min)": "FOCUS_TIME",  # Add focus time setting
-            "Break Time (min)": "BREAK_TIME",  # Add break time setting
+            "Focus Time (min)": "FOCUS_TIME", 
+            "Break Time (min)": "BREAK_TIME",  
         }
         self.entries = {}
 
@@ -169,8 +170,8 @@ class SettingsWindow:
                 self.entries[setting_key] = voice_combobox
             elif setting_key in ["FOCUS_TIME", "BREAK_TIME"]:
                 # Assuming focus_options and break_options are defined in PomodoroApp or UIConfig
-                focus_options = [1, 15, 25, 50, 90]  # Define these as needed
-                break_options = [1, 5, 10, 15]
+                focus_options = [15, 25, 50, 90]  # Define these as needed
+                break_options = [5, 10, 15]
                 options = focus_options if setting_key == "FOCUS_TIME" else break_options
                 combobox = ttk.Combobox(frame, values=options, state="readonly", style="TCombobox")
                 combobox.set(current_value)
