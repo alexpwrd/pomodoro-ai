@@ -149,17 +149,15 @@ class PomodoroApp:
         self.sidebar.pack(expand=False, fill='y', side='left', anchor='nw')
         self.sidebar.pack_propagate(False)  # Prevent the sidebar from resizing to fit its children
 
-        # Control buttons frame
+        # Control buttons frame for Start, Pause, and Skip
         control_buttons_frame = tk.Frame(self.sidebar, bg=self.ui.colors["sidebar_bg"])
         control_buttons_frame.pack(pady=10, fill='x')
 
-        # Adding buttons
+        # Adding Start, Pause, and Skip buttons
         self.start_button = self.ui.create_modern_button(control_buttons_frame, "Start", self.start_pomodoro)
         self.pause_button = self.ui.create_modern_button(control_buttons_frame, "Pause", self.pause_pomodoro, state=tk.DISABLED)
         self.skip_button = self.ui.create_modern_button(control_buttons_frame, "Skip", self.skip_break, state=tk.DISABLED)
-        self.reset_button = self.ui.create_modern_button(control_buttons_frame, "Reset", self.reset_pomodoro, state=tk.DISABLED)
-        self.mute_button = self.ui.create_modern_button(control_buttons_frame, "Mute", lambda: self.handle_toggle_mute())
-        for button in [self.start_button, self.pause_button, self.skip_button, self.reset_button, self.mute_button]:
+        for button in [self.start_button, self.pause_button, self.skip_button]:
             button.pack(side='top', pady=5)
 
         # Session statistics
@@ -170,9 +168,16 @@ class PomodoroApp:
         self.break_session_label = tk.Label(session_stats_frame, text=f"Breaks: {self.break_sessions_completed}/{self.max_break_sessions}", bg=self.ui.colors['sidebar_bg'], fg=self.ui.colors['text'])
         self.break_session_label.pack(side='top')
 
-        # Add Settings Button at the bottom of the sidebar
-        self.settings_button = self.ui.create_modern_button(self.sidebar, "Settings", self.open_settings_window, style='Modern.TButton')
-        self.settings_button.pack(side='bottom', pady=10, fill='x', anchor='s')  # Adjusted to pin to the bottom
+        # Bottom control buttons frame for Mute, Reset, and Settings
+        bottom_buttons_frame = tk.Frame(self.sidebar, bg=self.ui.colors["sidebar_bg"])
+        bottom_buttons_frame.pack(side='bottom', fill='x', pady=10)
+
+        # Mute, Reset, and Settings buttons stacked vertically
+        self.mute_button = self.ui.create_modern_button(bottom_buttons_frame, "Mute", lambda: self.handle_toggle_mute())
+        self.reset_button = self.ui.create_modern_button(bottom_buttons_frame, "Reset", self.reset_pomodoro, state=tk.DISABLED)
+        self.settings_button = self.ui.create_modern_button(bottom_buttons_frame, "Settings", self.open_settings_window, style='Modern.TButton')
+        for button in [self.mute_button, self.reset_button, self.settings_button]:
+            button.pack(side='top', pady=5)
 
     def initialize_ui_elements(self):
         # Progress bar for showing the current session's progress
