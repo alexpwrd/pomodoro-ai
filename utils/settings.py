@@ -136,7 +136,7 @@ class SettingsWindow:
 
     def create_widgets(self):
         frame = ttk.Frame(self.window, style="TFrame")
-        frame.pack(padx=40, pady=40)
+        frame.pack(padx=10, pady=10)
 
         settings = {
             "User Name": "USER_NAME",
@@ -148,43 +148,41 @@ class SettingsWindow:
         }
         self.entries = {}
 
+     # Define a uniform width for entry and combobox widgets for alignment
+        entry_width = 30
+
         for i, (label, setting_key) in enumerate(settings.items()):
             label_widget = self.ui.create_label(frame, text=f"{label}:")
-            label_widget.grid(row=i, column=0, padx=10, pady=10)
-            current_value = self.app.settings_manager.get_setting(setting_key, "")
+            label_widget.grid(row=i, column=0, padx=(10, 20), pady=10, sticky="e")  # Right-align labels with increased padding
 
             if setting_key == "api_key":
-                entry_widget = self.ui.create_entry(frame)
+                entry_widget = self.ui.create_entry(frame, width=entry_width)
                 if self.app.api_key_manager.api_key_exists():
                     entry_widget.insert(0, "**********************")
                 else:
-                    entry_widget.insert(0, current_value)
+                    entry_widget.insert(0, self.app.settings_manager.get_setting(setting_key, ""))
                 entry_widget.bind("<FocusIn>", lambda event, e=entry_widget: e.delete(0, tk.END) if e.get() == "**********************" else None)
                 entry_widget.bind("<FocusOut>", lambda event, e=entry_widget: e.insert(0, "**********************") if not e.get() else None)
-                entry_widget.grid(row=i, column=1, padx=10, pady=10)
-                self.entries[setting_key] = entry_widget
             elif setting_key == "AI_VOICE":
-                voice_combobox = ttk.Combobox(frame, values=["alloy", "echo", "fable", "onyx", "nova", "shimmer"], state="readonly", style="TCombobox")
-                voice_combobox.set(current_value)
-                voice_combobox.grid(row=i, column=1, padx=10, pady=10)
-                self.entries[setting_key] = voice_combobox
+                entry_widget = ttk.Combobox(frame, values=["alloy", "echo", "fable", "onyx", "nova", "shimmer"], state="readonly", width=entry_width)
+                entry_widget.set(self.app.settings_manager.get_setting(setting_key, ""))
             elif setting_key in ["FOCUS_TIME", "BREAK_TIME"]:
-                # Assuming focus_options and break_options are defined in PomodoroApp or UIConfig
-                focus_options = [15, 25, 50, 90]  # Define these as needed
-                break_options = [5, 10, 15]
-                options = focus_options if setting_key == "FOCUS_TIME" else break_options
-                combobox = ttk.Combobox(frame, values=options, state="readonly", style="TCombobox")
-                combobox.set(current_value)
-                combobox.grid(row=i, column=1, padx=10, pady=10)
-                self.entries[setting_key] = combobox
+                options = [15, 25, 50, 90] if setting_key == "FOCUS_TIME" else [5, 10, 15]
+                entry_widget = ttk.Combobox(frame, values=options, state="readonly", width=entry_width)
+                entry_widget.set(self.app.settings_manager.get_setting(setting_key, ""))
             else:
-                entry_widget = self.ui.create_entry(frame)
-                entry_widget.insert(0, current_value)
-                entry_widget.grid(row=i, column=1, padx=10, pady=10)
-                self.entries[setting_key] = entry_widget
+                entry_widget = self.ui.create_entry(frame, width=entry_width)
+                entry_widget.insert(0, self.app.settings_manager.get_setting(setting_key, ""))
 
-        save_button = self.ui.create_modern_button(frame, text="Save", command=self.apply_and_save_settings)
-        save_button.grid(row=len(settings), column=0, columnspan=2, pady=20)
+            # Left-align entries with increased right padding
+            entry_widget.grid(row=i, column=1, padx=(10, 20), pady=10, sticky="w")
+            self.entries[setting_key] = entry_widget
+
+        # Create a separate frame for the save button to control its size and positioning
+        button_frame = ttk.Frame(frame, style="TFrame")
+        button_frame.grid(row=len(settings), column=1, sticky="e", padx=(5, 20), pady=20)
+        save_button = self.ui.create_modern_button(button_frame, text="Save", command=self.apply_and_save_settings)
+        save_button.pack(pady=5, padx=5)  # Use pack within the button frame for better control
 
     def on_close(self):
         # Handle any necessary cleanup or final actions
