@@ -29,6 +29,7 @@ class PomodoroApp:
         self.master = master
         self.ui = UIConfig()
         self.status_var = tk.StringVar(value="Ready")  # Define status_var with a default message
+        self.time_var = tk.StringVar()  # Initialize the time_var
         self.initialize_managers()
         self.check_and_initialize_settings()  # New method to handle first-time setup and loading
         self.load_api_settings()
@@ -44,6 +45,19 @@ class PomodoroApp:
         else:
             self.ai_utils = None
 
+    def load_user_settings(self):
+        # Load user profile settings
+        self.user_name = self.settings_manager.get_setting("USER_NAME", "Default User")
+        self.profession = self.settings_manager.get_setting("PROFESSION", "Default Profession")
+        self.ai_voice = self.settings_manager.get_setting("AI_VOICE", "alloy")  # Correct setting for AI voice
+
+        # Load timer settings
+        self.focus_length = int(self.settings_manager.get_setting("FOCUS_TIME", 25)) * 60  # Default is 25 minutes, converted to seconds
+        self.short_break = int(self.settings_manager.get_setting("BREAK_TIME", 5)) * 60  # Default is 5 minutes, converted to seconds
+
+        # Update the display to reflect the loaded focus time
+        self.update_display(self.focus_length)
+
     def initialize_managers(self):
         self.api_key_manager = APIKeyManager()
         self.settings_manager = SettingsManager(callback=self.reload_user_settings)
@@ -51,6 +65,7 @@ class PomodoroApp:
     def reload_user_settings(self):
         """Reloads user settings from the settings manager."""
         self.load_user_settings()
+        self.initialize_timing()  # Reinitialize timing to update focus and break lengths
 
     def handle_settings_change(self, key, value):
         if key == "API_KEY":
@@ -85,16 +100,14 @@ class PomodoroApp:
             self.ai_utils = None
             logger.info("API Key is not set. Please set your API key for full functionality.")
 
-    def load_user_settings(self):
-        self.user_name = self.settings_manager.get_setting("USER_NAME", "Default User")
-        self.profession = self.settings_manager.get_setting("PROFESSION", "Default Profession")
-        self.ai_voice = self.settings_manager.get_setting("AI_VOICE", "alloy")  # Correct setting for AI voice
-
     def initialize_timing(self):
         self.focus_options = [1, 15, 25, 50, 90]  # in minutes
         self.break_options = [1, 5, 10, 15]  # in minutes
-        self.selected_focus_length = tk.IntVar(self.master, value=25)  # Default to 25 minutes
-        self.selected_break_length = tk.IntVar(self.master, value=5)  # Default to 5 minutes
+        # Use settings for default values
+        focus_length = self.settings_manager.get_setting("FOCUS_TIME", 25)
+        break_length = self.settings_manager.get_setting("BREAK_TIME", 5)
+        self.selected_focus_length = tk.IntVar(self.master, value=focus_length)  # Use setting value
+        self.selected_break_length = tk.IntVar(self.master, value=break_length)  # Use setting value
         self.focus_length = self.selected_focus_length.get() * 60
         self.short_break = self.selected_break_length.get() * 60
         self.remaining_time = self.focus_length  # Start with the focus time
@@ -133,26 +146,8 @@ class PomodoroApp:
         logging.debug("Creating new sidebar.")
 
         self.sidebar = tk.Frame(self.master, bg=self.ui.colors["sidebar_bg"], width=150, height=600)
-        # Create a sidebar frame with a darker background
-        self.sidebar = tk.Frame(self.master, bg=self.ui.colors["sidebar_bg"], width=150, height=600)
         self.sidebar.pack(expand=False, fill='y', side='left', anchor='nw')
         self.sidebar.pack_propagate(False)  # Prevent the sidebar from resizing to fit its children
-
-        # Time selection frame
-        time_selection_frame = tk.Frame(self.sidebar, bg=self.ui.colors["sidebar_bg"])
-        time_selection_frame.pack(pady=10, fill='x')
-
-        # Focus time dropdown
-        focus_label = tk.Label(time_selection_frame, text="Focus Time (min):", bg=self.ui.colors["sidebar_bg"], fg=self.ui.colors["text"])
-        focus_label.pack(side='top')
-        self.focus_dropdown = self.ui.create_option_menu(time_selection_frame, self.selected_focus_length, self.focus_options, self.update_focus_length)
-        self.focus_dropdown.pack(side='top')
-
-        # Break time dropdown
-        break_label = tk.Label(time_selection_frame, text="Break Time (min):", bg=self.ui.colors["sidebar_bg"], fg=self.ui.colors["text"])
-        break_label.pack(side='top')
-        self.break_dropdown = self.ui.create_option_menu(time_selection_frame, self.selected_break_length, self.break_options, self.update_break_length)
-        self.break_dropdown.pack(side='top')
 
         # Control buttons frame
         control_buttons_frame = tk.Frame(self.sidebar, bg=self.ui.colors["sidebar_bg"])
@@ -161,23 +156,23 @@ class PomodoroApp:
         # Adding buttons
         self.start_button = self.ui.create_modern_button(control_buttons_frame, "Start", self.start_pomodoro)
         self.pause_button = self.ui.create_modern_button(control_buttons_frame, "Pause", self.pause_pomodoro, state=tk.DISABLED)
+        self.skip_button = self.ui.create_modern_button(control_buttons_frame, "Skip", self.skip_break, state=tk.DISABLED)
         self.reset_button = self.ui.create_modern_button(control_buttons_frame, "Reset", self.reset_pomodoro, state=tk.DISABLED)
-        self.break_button = self.ui.create_modern_button(control_buttons_frame, "Take a Break", self.start_break)
         self.mute_button = self.ui.create_modern_button(control_buttons_frame, "Mute", lambda: self.handle_toggle_mute())
-        for button in [self.start_button, self.pause_button, self.reset_button, self.break_button, self.mute_button]:
+        for button in [self.start_button, self.pause_button, self.skip_button, self.reset_button, self.mute_button]:
             button.pack(side='top', pady=5)
 
         # Session statistics
         session_stats_frame = tk.Frame(self.sidebar, bg=self.ui.colors['sidebar_bg'])
         session_stats_frame.pack(pady=10, fill='x')
-        self.work_session_label = tk.Label(session_stats_frame, text=f"Work Sessions: {self.work_sessions_completed}/{self.max_work_sessions}", bg=self.ui.colors['sidebar_bg'], fg=self.ui.colors['text'])
+        self.work_session_label = tk.Label(session_stats_frame, text=f"Work: {self.work_sessions_completed}/{self.max_work_sessions}", bg=self.ui.colors['sidebar_bg'], fg=self.ui.colors['text'])
         self.work_session_label.pack(side='top')
-        self.break_session_label = tk.Label(session_stats_frame, text=f"Break Sessions: {self.break_sessions_completed}/{self.max_break_sessions}", bg=self.ui.colors['sidebar_bg'], fg=self.ui.colors['text'])
+        self.break_session_label = tk.Label(session_stats_frame, text=f"Breaks: {self.break_sessions_completed}/{self.max_break_sessions}", bg=self.ui.colors['sidebar_bg'], fg=self.ui.colors['text'])
         self.break_session_label.pack(side='top')
 
         # Add Settings Button at the bottom of the sidebar
-        self.settings_button = self.ui.create_modern_button(control_buttons_frame, "Settings", self.open_settings_window, style='Modern.TButton')
-        self.settings_button.pack(side='bottom', pady=10)
+        self.settings_button = self.ui.create_modern_button(self.sidebar, "Settings", self.open_settings_window, style='Modern.TButton')
+        self.settings_button.pack(side='bottom', pady=10, fill='x', anchor='s')  # Adjusted to pin to the bottom
 
     def initialize_ui_elements(self):
         # Progress bar for showing the current session's progress
@@ -355,6 +350,33 @@ class PomodoroApp:
             self.update_display(self.remaining_time)
             self.progress["value"] = 0
 
+
+    def skip_break(self):
+        if not self.is_focus_time and self.running:
+            # Stop any ongoing audio playback
+            sd.stop()
+
+            # Log skipping the break
+            logger.info("Skipping break session.")
+            # Reset the break session counter and immediately start a new work session
+            self.break_sessions_completed = 0
+            self.is_focus_time = True
+            self.remaining_time = self.focus_length
+            self.update_display(self.remaining_time)
+            self.progress["maximum"] = self.focus_length
+            self.progress["value"] = 0
+            self.update_state_indicator("focus")
+            
+            # Play sound indicating the start of focus time
+            play_sound(for_break=False)  # Ensure this function is defined to play a specific sound for focus time
+            
+            # Fetch and display a motivational quote for focus time
+            current_tasks = self.collect_current_tasks()
+            self.fetch_motivational_quote(for_break=False, current_todo=current_tasks)
+            
+            # Start the pomodoro timer for the new focus session
+            self.start_pomodoro()
+
     def start_break(self):
         # Stop any ongoing work session before starting the break.
         if self.running and self.is_focus_time:
@@ -378,11 +400,15 @@ class PomodoroApp:
         self.start_button.config(state=tk.DISABLED)
         self.pause_button.config(state=tk.NORMAL)
         self.reset_button.config(state=tk.DISABLED)
-        self.break_button.config(state=tk.DISABLED)
+        # self.break_button.config(state=tk.DISABLED)
+        self.skip_button.config(state=tk.NORMAL)  # Enable the skip button when starting a break
 
         self.update_state_indicator("break")  # Update state indicator to yellow for break time
 
     def play_audio(self, file_path):
+        if self.is_muted:
+            logger.info("Audio playback skipped due to mute state.")
+            return
         try:
             data, samplerate = sf.read(file_path, dtype='float32')
             sd.play(data, samplerate)
@@ -408,6 +434,9 @@ class PomodoroApp:
 
     def text_to_speech(self, text):
         """Converts text to speech and saves as an audio file using the user's preferred voice."""
+        if self.is_muted:
+            logger.info("Text-to-speech skipped due to mute state.")
+            return
         user_voice = self.settings_manager.get_setting("AI_VOICE", "onyx")
         valid_voices = {"alloy", "echo", "fable", "onyx", "nova", "shimmer"}
 
@@ -442,6 +471,17 @@ class PomodoroApp:
         mins, secs = divmod(remaining_time, 60)
         self.time_var.set(f"{mins:02d}:{secs:02d}")
 
+    def update_timer_settings(self):
+        # Fetch new settings
+        self.focus_length = int(self.settings_manager.get_setting("FOCUS_TIME", 25)) * 60
+        self.short_break = int(self.settings_manager.get_setting("BREAK_TIME", 5)) * 60
+
+        # Update the progress bar maximum to reflect the new focus length
+        self.progress["maximum"] = self.focus_length
+
+        # Optionally, reset the timer to start with the new settings
+        self.reset_pomodoro()
+
     def collect_current_tasks(self):
         """Collects all tasks from the todo_frame and returns them as a single comma-separated string."""
         return ', '.join(task_label.cget("text") for task_frame in self.todo_frame.winfo_children() for task_label in task_frame.winfo_children() if isinstance(task_label, tk.Label))
@@ -452,9 +492,8 @@ class PomodoroApp:
             self.start_button.config(state=tk.DISABLED)
             self.pause_button.config(state=tk.NORMAL)
             self.reset_button.config(state=tk.DISABLED)
-            self.break_button.config(state=tk.DISABLED)
-            self.focus_dropdown.config(state="disabled")
-            self.break_dropdown.config(state="disabled")
+            self.skip_button.config(state=tk.DISABLED)  # Disable the skip button when starting a work session
+            # self.break_button.config(state=tk.DISABLED)
 
             # Retrieve all tasks from the todo_frame using the new method
             current_todo = self.collect_current_tasks()  # Combine all tasks into a single string
@@ -475,24 +514,22 @@ class PomodoroApp:
         self.start_button.config(text="Resume", command=self.start_pomodoro, state=tk.NORMAL)
         self.pause_button.config(state=tk.DISABLED)
         self.reset_button.config(state=tk.NORMAL)
-        self.break_button.config(state=tk.NORMAL)
+        # self.break_button.config(state=tk.NORMAL)
         self.update_state_indicator("paused")
-        self.focus_dropdown.config(state="normal")
-        self.break_dropdown.config(state="normal")
         logger.info("Timer paused.")
 
     def reset_pomodoro(self):
         self.running = False
         self.current_cycle = 0
         self.is_focus_time = True
-        self.remaining_time = self.focus_length
+        self.remaining_time = int(self.focus_length)  # Ensure it's an integer
+        logger.debug(f"Updating display with remaining_time: {self.remaining_time} (type: {type(self.remaining_time)})")
         self.update_display(self.remaining_time)
         self.start_button.config(text="Start", command=self.start_pomodoro, state=tk.NORMAL)
         self.pause_button.config(state=tk.DISABLED)
         self.reset_button.config(state=tk.DISABLED)
-        self.break_button.config(state=tk.NORMAL)
-        self.focus_dropdown.config(state="normal")
-        self.break_dropdown.config(state="normal")
+        # self.break_button.config(state=tk.NORMAL)
+        self.skip_button.config(state=tk.DISABLED)  # Disable the skip button when resetting the timer
         self.is_resuming = False 
         self.progress["value"] = 0
         self.update_state_indicator("default")
@@ -520,7 +557,7 @@ class PomodoroApp:
             self.is_focus_time = False
             self.remaining_time = self.short_break
             self.update_state_indicator("break")
-            self.work_session_label.config(text=f"Work Sessions: {self.work_sessions_completed}/{self.max_work_sessions}")
+            self.work_session_label.config(text=f"Work: {self.work_sessions_completed}/{self.max_work_sessions}")
             self.start_break()  # Start the break session
         else:
             play_sound(for_break=False)
@@ -531,7 +568,7 @@ class PomodoroApp:
             self.is_focus_time = True
             self.remaining_time = self.focus_length
             self.update_state_indicator("focus")
-            self.break_session_label.config(text=f"Break Sessions: {self.break_sessions_completed}/{self.max_break_sessions}")
+            self.break_session_label.config(text=f"Breaks: {self.break_sessions_completed}/{self.max_break_sessions}")
             self.start_pomodoro()  # Start the focus session
 
     def update_state_indicator(self, state):
@@ -539,7 +576,15 @@ class PomodoroApp:
         self.state_indicator_canvas.itemconfig(self.state_indicator, fill=color)
 
     def handle_toggle_mute(self):
-        self.is_muted = toggle_mute(self.is_muted, self.ui.update_mute_button_style, self.mute_button)
+        self.is_muted = not self.is_muted
+        if self.is_muted:
+            # Stop any ongoing audio playback
+            sd.stop()
+            self.mute_button.config(text="Unmute")
+        else:
+            self.mute_button.config(text="Mute")
+        # Update the mute button style based on the new mute state
+        self.ui.update_mute_button_style(self.is_muted)
 
 if __name__ == "__main__":
     root = tk.Tk()

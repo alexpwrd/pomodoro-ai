@@ -162,9 +162,11 @@ class UIConfig:
         return entry
 
     def create_option_menu(self, master, variable, options, command=None):
-        option_menu = tk.OptionMenu(master, variable, *options, command=command)
-        option_menu.config(bg=self.colors["background"], fg=self.colors["text"], font=self.global_font)
-        option_menu["menu"].config(bg=self.colors["background"], fg=self.colors["text"])
-        return option_menu
+        combobox = ttk.Combobox(master, textvariable=variable, values=options, state="readonly")
+        combobox.bind("<<ComboboxSelected>>", command)
+        combobox.config(font=self.global_font)  # Set the font
+        combobox.set(variable.get())  # Set the current value to the variable's value
+        combobox.style = "TCombobox"  # Apply the TCombobox style
+        return combobox
     
 

@@ -118,7 +118,9 @@ class SettingsManager:
         return {
             "USER_NAME": "Default User",
             "PROFESSION": "Default Profession",
-            "AI_VOICE": "alloy"
+            "AI_VOICE": "alloy",
+            "FOCUS_TIME": 25,  # Default focus time in minutes
+            "BREAK_TIME": 5,  # Default break time in minutes
         }
 
 
@@ -139,7 +141,9 @@ class SettingsWindow:
             "User Name": "USER_NAME",
             "Profession": "PROFESSION",
             "AI Voice": "AI_VOICE",
-            "OpenAI API Key": "api_key"
+            "OpenAI API Key": "api_key",
+            "Focus Time (min)": "FOCUS_TIME",  # Add focus time setting
+            "Break Time (min)": "BREAK_TIME",  # Add break time setting
         }
         self.entries = {}
 
@@ -163,6 +167,15 @@ class SettingsWindow:
                 voice_combobox.set(current_value)
                 voice_combobox.grid(row=i, column=1, padx=10, pady=10)
                 self.entries[setting_key] = voice_combobox
+            elif setting_key in ["FOCUS_TIME", "BREAK_TIME"]:
+                # Assuming focus_options and break_options are defined in PomodoroApp or UIConfig
+                focus_options = [1, 15, 25, 50, 90]  # Define these as needed
+                break_options = [1, 5, 10, 15]
+                options = focus_options if setting_key == "FOCUS_TIME" else break_options
+                combobox = ttk.Combobox(frame, values=options, state="readonly", style="TCombobox")
+                combobox.set(current_value)
+                combobox.grid(row=i, column=1, padx=10, pady=10)
+                self.entries[setting_key] = combobox
             else:
                 entry_widget = self.ui.create_entry(frame)
                 entry_widget.insert(0, current_value)
@@ -189,9 +202,10 @@ class SettingsWindow:
                 self.app.settings_manager.update_setting(key, value)
 
         # Pass the reinitialize_ai_utils method as a callback
-        success = self.app.settings_manager.save_settings(callback=self.app.reinitialize_ai_utils)
+        success = self.app.settings_manager.save_settings()
         if success:
             logger.info("Settings saved successfully.")
+            self.app.update_timer_settings()  # This method needs to be implemented in PomodoroApp
         else:
             logger.error("Failed to save settings (apply_and_save_settings)")
 
