@@ -167,7 +167,7 @@ class SettingsWindow:
                 entry_widget = ttk.Combobox(frame, values=["alloy", "echo", "fable", "onyx", "nova", "shimmer"], state="readonly", width=entry_width)
                 entry_widget.set(self.app.settings_manager.get_setting(setting_key, ""))
             elif setting_key in ["FOCUS_TIME", "BREAK_TIME"]:
-                options = [15, 25, 50, 90] if setting_key == "FOCUS_TIME" else [5, 10, 15]
+                options = [1, 15, 25, 50, 90] if setting_key == "FOCUS_TIME" else [1, 5, 10, 15]
                 entry_widget = ttk.Combobox(frame, values=options, state="readonly", width=entry_width)
                 entry_widget.set(self.app.settings_manager.get_setting(setting_key, ""))
             else:

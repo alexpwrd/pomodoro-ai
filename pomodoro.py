@@ -65,9 +65,15 @@ class PomodoroApp:
         self.settings_manager = SettingsManager(callback=self.reload_user_settings)
 
     def reload_user_settings(self):
-        """Reloads user settings from the settings manager."""
+        """Reloads user settings from the settings manager and updates AIUtils."""
         self.load_user_settings()
         self.initialize_timing()  # Reinitialize timing to update focus and break lengths
+        # Reinitialize AIUtils with the new settings
+        if self.client is not None:
+            self.ai_utils = AIUtils(self.client, self.user_name, self.profession)
+        else:
+            self.ai_utils = None
+            logger.info("AI Utils cannot be initialized due to missing API key.")
 
     def handle_settings_change(self, key, value):
         if key == "API_KEY":
@@ -103,8 +109,8 @@ class PomodoroApp:
             logger.info("API Key is not set. Please set your API key for full functionality.")
 
     def initialize_timing(self):
-        self.focus_options = [15, 25, 50, 90]  # in minutes
-        self.break_options = [5, 10, 15]  # in minutes
+        self.focus_options = [1, 15, 25, 50, 90]  # in minutes
+        self.break_options = [1,5, 10, 15]  # in minutes
         # Use settings for default values
         focus_length = self.settings_manager.get_setting("FOCUS_TIME", 25)
         break_length = self.settings_manager.get_setting("BREAK_TIME", 5)
@@ -396,6 +402,7 @@ class PomodoroApp:
             self.skip_button.config(state=tk.DISABLED)
 
     def start_break(self):
+        self.reload_user_settings()  # Reload settings at the start of the break
         # Stop any ongoing work session before starting the break.
         if self.running and self.is_focus_time:
             self.running = False
@@ -436,19 +443,25 @@ class PomodoroApp:
             logger.error(f"Error playing audio file: {e}")
 
     def fetch_motivational_quote(self, for_break=False, current_todo=""):
-        if self.ai_utils is not None:  # Check if ai_utils is initialized
+        def thread_target():
+            if self.ai_utils is None:
+                self.master.after(0, lambda: self.quote_var.set("AI functionalities are not available."))
+                logger.warning("AI Utils is not initialized or available.")
+                return
+
             try:
                 message = self.ai_utils.fetch_motivational_quote(for_break, current_todo)
                 self.master.after(0, lambda: self.quote_var.set(message if not for_break else f"Break Time: {message}"))
                 self.master.after(0, lambda: self.status_var.set("Speaking..."))
-                speaking_thread = threading.Thread(target=self.speak_quote, args=(message,))
-                speaking_thread.start()
+                self.speak_quote(message)
             except Exception as e:
-                self.quote_var.set("AI functionalities are not currently available due to missing or invalid API Key.")
-                logger.error(f"Error fetching idea: {e}")
-        else:
-            self.master.after(0, lambda: self.quote_var.set("AI functionalities are not available."))
-            logger.warning("AI Utils is not initialized or available.")
+                self.master.after(0, lambda: self.quote_var.set("Error fetching quote. Please check your connection."))
+                logger.error(f"Error fetching motivational quote: {e}")
+
+        quote_thread = threading.Thread(target=thread_target)
+        quote_thread.daemon = True
+        quote_thread.start()
+
 
     def text_to_speech(self, text):
         """Converts text to speech and saves as an audio file using the user's preferred voice."""
@@ -506,6 +519,7 @@ class PomodoroApp:
         return ', '.join(task_label.cget("text") for task_frame in self.todo_frame.winfo_children() for task_label in task_frame.winfo_children() if isinstance(task_label, tk.Label))
 
     def start_pomodoro(self):
+        self.reload_user_settings()  # Ensure the latest settings are loaded
         if not self.running:
             self.running = True
             self.start_button.config(state=tk.DISABLED)
@@ -529,15 +543,25 @@ class PomodoroApp:
 
     def pause_pomodoro(self):
         self.running = False
-        self.is_resuming = True  # Set the flag to indicate resuming
-        self.start_button.config(text="Resume", command=self.start_pomodoro, state=tk.NORMAL)
+        self.paused_time = self.remaining_time  # Save the remaining time
+        self.start_button.config(text="Resume", command=self.resume_pomodoro, state=tk.NORMAL)
         self.pause_button.config(state=tk.DISABLED)
         self.reset_button.config(state=tk.NORMAL)
-        # self.break_button.config(state=tk.NORMAL)
         self.update_state_indicator("paused")
         logger.info("Timer paused.")
 
+    def resume_pomodoro(self):
+        self.remaining_time = self.paused_time  # Use the saved paused time to resume
+        self.running = True
+        self.start_button.config(text="Pause", command=self.pause_pomodoro, state=tk.NORMAL)
+        self.pause_button.config(state=tk.NORMAL)
+        self.reset_button.config(state=tk.NORMAL)
+        self.update_state_indicator("focus" if self.is_focus_time else "break")
+        self.pomodoro_timer()  # Continue the timer
+        logger.info("Timer resumed.")
+
     def reset_pomodoro(self):
+        self.reload_user_settings()  # Reload settings at the start of the break
         self.running = False
         self.current_cycle = 0
         self.is_focus_time = True
@@ -566,6 +590,7 @@ class PomodoroApp:
             self.switch_mode()
 
     def switch_mode(self):
+        self.reload_user_settings()  # Reload settings at the start of the break
         self.running = False  # Stop the current timer
         if self.is_focus_time:
             play_sound(for_break=True)
