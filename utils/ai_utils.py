@@ -3,11 +3,10 @@
 import random
 
 class AIUtils:
-    def __init__(self, client, user_name, profession, company):
+    def __init__(self, client, user_name, profession):
         self.client = client
         self.user_name = user_name
         self.profession = profession
-        self.company = company
 
     def fetch_motivational_quote(self, for_break=False, current_todo=""):
         themes = [
@@ -59,7 +58,7 @@ class AIUtils:
             ]
             activity = random.choice(activities)
             prompt = (
-                f"Compose a concise, unique, and creative short message for {self.user_name}, who has just finished a work session as a {self.profession} at {self.company} working on: '{current_todo}'. "
+                f"Compose a concise, unique, and creative short message for {self.user_name}, who has just finished a work session as a {self.profession} working on: '{current_todo}'. "
                 f"Mention the task(s) they are working on and suggest a simple 5 or 10 minute break activity like {activity}. "
                 f"Keep the suggestion brief, easy to understand, and suitable for being read aloud by a voice assistant. "
                 f"Focus on activities that are scientifically proven to reduce stress and enhance focus. "

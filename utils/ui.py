@@ -43,11 +43,43 @@ class UIConfig:
         }
         self.configure_styles()
 
+
     def configure_styles(self):
         style = ttk.Style()
         style.theme_use('default')
-        self.global_font = ("Helvetica", 14)
+        self.global_font = ("Helvetica", 15)
 
+        # Configure frame style
+        style.configure("TFrame", background=self.colors["background"])
+
+        # Configure entry style
+        style.configure("TEntry", 
+                        fieldbackground='#2D2D2D',  #  input fields
+                        background=self.colors["entry"]["bg"],  # White background (general background, not as critical)
+                        foreground='#FFFFFF',  # for contrast
+                        font=("Helvetica", 15, "bold")) 
+
+        # Configure combobox style
+        style.configure("TCombobox", 
+                        fieldbackground='#2D2D2D',  # input fields
+                        background='#2D2D2D',  # general background
+                        foreground='#FFFFFF',  # text
+                        font=self.global_font)
+        
+        # Map combobox styles for different states and attempt to set arrow color
+        style.map('TCombobox',
+                fieldbackground=[('readonly', '#2D2D2D'), ('disabled', '#2D2D2D')],
+                background=[('readonly', '#2D2D2D'), ('disabled', '#2D2D2D')],
+                foreground=[('readonly', '#FFFFFF'), ('disabled', '#BBBBBB')],
+                arrowcolor=[('readonly', '#FFFFFF'), ('disabled', '#BBBBBB')])  # Attempt to change arrow color
+
+        # Additional configuration for the dropdown list items
+        style.configure("TCombobox.Listbox",
+                        background='#2D2D2D',  # Almost black for dropdown list background
+                        foreground='#FFFFFF',  # dropdown list items
+                        font=self.global_font)
+        
+        
         # Configure the progress bar style
         style.configure(
             "green.Horizontal.TProgressbar",
@@ -89,19 +121,11 @@ class UIConfig:
             foreground=[('active', self.colors['mute_button']['hover_fg']), ('disabled', self.colors['mute_button']['disabled_fg'])]
         )
 
-        # Configure label and entry styles
+        # Configure label style
         style.configure(
             "TLabel",
             background=self.colors["background"],
             foreground=self.colors["text"],
-            font=self.global_font
-        )
-        style.configure(
-            "TEntry",
-            fieldbackground=self.colors["entry"]["field_bg"],
-            background=self.colors["entry"]["bg"],
-            foreground=self.colors["entry"]["fg"],
-            borderwidth=0,
             font=self.global_font
         )
 

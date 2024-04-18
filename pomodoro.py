@@ -67,16 +67,6 @@ class PomodoroApp:
         # Load settings without checking for API key
         self.load_user_settings()
 
-    def prompt_for_api_key(self):
-        # Prompt the user to enter their OpenAI API key if not set
-        api_key = simpledialog.askstring("API Key Required", "Enter your OpenAI API key:", parent=self.master)
-        if api_key:
-            self.api_key_manager.set_api_key(api_key)
-            logger.info("API key set successfully.")
-        else:
-            logger.warning("No API key provided; some functionalities will be restricted.")
-            messagebox.showinfo("API Key", "You can set the API key later via Settings.")
-
     def load_api_settings(self):
         self.openai_api_key = self.api_key_manager.get_api_key()
         if self.openai_api_key:
@@ -86,12 +76,10 @@ class PomodoroApp:
             self.client = None
             self.ai_utils = None
             logger.info("API Key is not set. Please set your API key for full functionality.")
-            self.prompt_for_api_key()  # Optionally prompt for API key at startup
 
     def load_user_settings(self):
         self.user_name = self.settings_manager.get_setting("USER_NAME", "Default User")
         self.profession = self.settings_manager.get_setting("PROFESSION", "Default Profession")
-        self.company = self.settings_manager.get_setting("COMPANY", "Default Company")
         self.ai_voice = self.settings_manager.get_setting("AI_VOICE", "alloy")  # Correct setting for AI voice
 
     def initialize_timing(self):

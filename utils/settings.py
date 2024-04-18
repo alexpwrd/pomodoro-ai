@@ -92,15 +92,17 @@ class SettingsManager:
     def save_settings(self):
         if not self.validate_settings():
             logger.error("Settings validation failed. Aborting save.")
-            return
+            return False
         try:
             with self.settings_file.open('w') as file:
                 json.dump(self.settings, file, indent=4)
                 logger.info("Settings saved successfully.")
             if self.callback:
                 self.callback()
+            return True
         except Exception as e:
-            logger.error(f"Failed to save settings: {e}")
+            logger.error(f"Failed to save settings(save_settings): {e}")
+            return False
 
     def get_setting(self, key, default=None):
         if self.settings is None:
@@ -116,7 +118,6 @@ class SettingsManager:
         return {
             "USER_NAME": "Default User",
             "PROFESSION": "Default Profession",
-            "COMPANY": "Default Company",
             "AI_VOICE": "alloy"
         }
 
@@ -131,20 +132,12 @@ class SettingsWindow:
         self.window.protocol("WM_DELETE_WINDOW", self.on_close)
 
     def create_widgets(self):
-        # Configure the style for the frame to match the window background
-        style = ttk.Style()
-        style.configure("TFrame", background="#2D2D2D")  # Adjust the color to match your window's background
-        style.configure("TEntry", foreground="white", background="#2D2D2D", insertbackground="white")  # Set text color to white and background to match the frame
-        style.configure("TCombobox", fieldbackground="#2D2D2D", background="#2D2D2D", foreground="white", selectbackground="#2D2D2D", selectforeground="white")
-
-
         frame = ttk.Frame(self.window, style="TFrame")
-        frame.pack(padx=30, pady=30)
+        frame.pack(padx=40, pady=40)
 
         settings = {
             "User Name": "USER_NAME",
             "Profession": "PROFESSION",
-            "Company": "COMPANY",
             "AI Voice": "AI_VOICE",
             "OpenAI API Key": "api_key"
         }
@@ -154,8 +147,9 @@ class SettingsWindow:
             label_widget = self.ui.create_label(frame, text=f"{label}:")
             label_widget.grid(row=i, column=0, padx=10, pady=10)
             current_value = self.app.settings_manager.get_setting(setting_key, "")
+
             if setting_key == "AI_VOICE":
-                voice_combobox = ttk.Combobox(frame, values=["alloy", "echo", "fable", "onyx", "nova", "shimmer"], state="readonly")
+                voice_combobox = ttk.Combobox(frame, values=["alloy", "echo", "fable", "onyx", "nova", "shimmer"], state="readonly", style="TCombobox")
                 voice_combobox.set(current_value)
                 voice_combobox.grid(row=i, column=1, padx=10, pady=10)
                 self.entries[setting_key] = voice_combobox
@@ -168,19 +162,25 @@ class SettingsWindow:
         save_button = self.ui.create_modern_button(frame, text="Save", command=self.apply_and_save_settings)
         save_button.grid(row=len(settings), column=0, columnspan=2, pady=20)
 
+    def on_close(self):
+        # Handle any necessary cleanup or final actions
+        logger.info("Closing settings window.")
+        self.window.destroy()  # Ensure the window is properly closed
+
     def apply_and_save_settings(self):
+        # Gather settings from UI components
         for key, entry in self.entries.items():
-            value = entry.get()
+            value = entry.get()  # Assuming entry is an input field
             if key == "api_key":
                 self.app.api_key_manager.set_api_key(value)
             else:
                 self.app.settings_manager.update_setting(key, value)
         
-        if self.app.settings_manager.save_settings():
-            self.ui.show_message("Settings saved successfully.")
+        # Attempt to save the settings
+        success = self.app.settings_manager.save_settings()
+        if success:
+            logger.info("Settings saved successfully.")
         else:
-            self.ui.show_message("Failed to save settings.")
-        self.window.destroy()
-
-    def on_close(self):
-        self.window.destroy()
+            logger.error("Failed to save settings (apply_and_save_settings)")
+        
+        self.window.destroy()  # Close the settings window regardless of the result
