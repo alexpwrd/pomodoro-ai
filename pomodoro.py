@@ -163,11 +163,10 @@ class PomodoroApp:
         control_buttons_frame = tk.Frame(self.sidebar, bg=self.ui.colors["sidebar_bg"])
         control_buttons_frame.pack(pady=10, fill='x')
 
-        # Adding Start, Pause, and Skip buttons
+        # Adding Start and Skip buttons
         self.start_button = self.ui.create_modern_button(control_buttons_frame, "Start", self.start_pomodoro)
-        self.pause_button = self.ui.create_modern_button(control_buttons_frame, "Pause", self.pause_pomodoro, state=tk.DISABLED)
         self.skip_button = self.ui.create_modern_button(control_buttons_frame, "Skip", self.skip_break, state=tk.DISABLED)
-        for button in [self.start_button, self.pause_button, self.skip_button]:
+        for button in [self.start_button, self.skip_button]:
             button.pack(side='top', pady=5)
 
         # Session statistics
@@ -423,7 +422,6 @@ class PomodoroApp:
         
         # Update button states.
         self.start_button.config(state=tk.DISABLED)
-        self.pause_button.config(state=tk.NORMAL)
         self.reset_button.config(state=tk.DISABLED)
         # self.break_button.config(state=tk.DISABLED)
         self.skip_button.config(state=tk.NORMAL)  # Enable the skip button when starting a break
@@ -522,30 +520,26 @@ class PomodoroApp:
         self.reload_user_settings()  # Ensure the latest settings are loaded
         if not self.running:
             self.running = True
-            self.start_button.config(state=tk.DISABLED)
-            self.pause_button.config(state=tk.NORMAL)
+            self.start_button.config(text="Pause", command=self.pause_pomodoro, state=tk.NORMAL)
             self.reset_button.config(state=tk.DISABLED)
             self.skip_button.config(state=tk.DISABLED)  # Disable the skip button when starting a work session
-            # self.break_button.config(state=tk.DISABLED)
 
-            # Retrieve all tasks from the todo_frame using the new method
             current_todo = self.collect_current_tasks()  # Combine all tasks into a single string
-
             if not self.is_resuming:
                 threading.Thread(target=self.fetch_motivational_quote, args=(False, current_todo)).start()
             else:
                 self.is_resuming = False
+
             self.progress["maximum"] = self.focus_length
             self.progress["value"] = 0
             self.pomodoro_timer()
             self.update_state_indicator("focus")
-
+            logger.info("Timer started.")
 
     def pause_pomodoro(self):
         self.running = False
         self.paused_time = self.remaining_time  # Save the remaining time
         self.start_button.config(text="Resume", command=self.resume_pomodoro, state=tk.NORMAL)
-        self.pause_button.config(state=tk.DISABLED)
         self.reset_button.config(state=tk.NORMAL)
         self.update_state_indicator("paused")
         logger.info("Timer paused.")
@@ -554,7 +548,6 @@ class PomodoroApp:
         self.remaining_time = self.paused_time  # Use the saved paused time to resume
         self.running = True
         self.start_button.config(text="Pause", command=self.pause_pomodoro, state=tk.NORMAL)
-        self.pause_button.config(state=tk.NORMAL)
         self.reset_button.config(state=tk.NORMAL)
         self.update_state_indicator("focus" if self.is_focus_time else "break")
         self.pomodoro_timer()  # Continue the timer
@@ -569,7 +562,6 @@ class PomodoroApp:
         logger.debug(f"Updating display with remaining_time: {self.remaining_time} (type: {type(self.remaining_time)})")
         self.update_display(self.remaining_time)
         self.start_button.config(text="Start", command=self.start_pomodoro, state=tk.NORMAL)
-        self.pause_button.config(state=tk.DISABLED)
         self.reset_button.config(state=tk.DISABLED)
         # self.break_button.config(state=tk.NORMAL)
         self.skip_button.config(state=tk.DISABLED)  # Disable the skip button when resetting the timer
@@ -623,6 +615,7 @@ class PomodoroApp:
     def update_state_indicator(self, state):
         color = self.ui.colors["state_indicator"].get(state, self.ui.colors["state_indicator"]["default"])
         self.state_indicator_canvas.itemconfig(self.state_indicator, fill=color)
+        logger.info(f"State updated to {state}.")
 
     def handle_toggle_mute(self):
         self.is_muted = not self.is_muted
