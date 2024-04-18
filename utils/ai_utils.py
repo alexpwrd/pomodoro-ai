@@ -34,7 +34,7 @@ class AIUtils:
         theme = random.choice(themes)
         if not for_break:
             prompt = (
-                f"Generate a motivational quote related to {theme} from a successful individual in the {self.profession} industry. This quote should inspire {self.user_name}, who is about to start a work session at {self.company}. "
+                f"Generate a motivational quote related to {theme} from a successful individual in the {self.profession} industry. This quote should inspire {self.user_name}. "
                 f"The user is working on the following task(s) during this work session:'{current_todo}'. " 
                 f"Begin the message with {self.user_name}'s name to grab their attention immediately. Follow with the quote and conclude with a brief reminder of their task and encouraging statement that incorporates humor and irony. No coffee references. "
                 f"Design this message to be concise, engaging, and easily readable aloud by a voice assistant. The entire message should be a single, impactful paragraph that subtly blends humor/irony with motivation, without directly attributing the quote to a specific person."
@@ -67,7 +67,7 @@ class AIUtils:
 
         chat_completion = self.client.chat.completions.create(
             messages=[
-                {"role": "system", "content": f"You are a motivational AI assistant to a {self.profession} at {self.company} named {self.user_name}. Aim for uniqueness, creativity, humour, and scientific grounding in your messages. Your messages will be read out loud to the user to format them in a way that would be easy for an apple OS voice to say out loud. "},
+                {"role": "system", "content": f"You are a motivational AI assistant to a {self.profession} named {self.user_name}. Aim for uniqueness, creativity, humour, and scientific grounding in your messages. Your messages will be read out loud to the user to format them in a way that would be easy for an apple OS voice to say out loud. "},
                 {"role": "user", "content": prompt}
             ],
             model="gpt-3.5-turbo",

@@ -40,7 +40,7 @@ class PomodoroApp:
         self.initialize_ui_elements()
 
         if self.client is not None:
-            self.ai_utils = AIUtils(self.client, self.user_name, self.profession, self.company)
+            self.ai_utils = AIUtils(self.client, self.user_name, self.profession)
         else:
             self.ai_utils = None
 
@@ -55,6 +55,14 @@ class PomodoroApp:
     def handle_settings_change(self, key, value):
         if key == "API_KEY":
             self.load_api_settings()  # Reload API settings which will reinitialize the AIUtils with new API key
+
+    def reinitialize_ai_utils(self):
+        self.load_api_settings()  # This will set self.client based on the new API key
+        if self.client is not None:
+            self.ai_utils = AIUtils(self.client, self.user_name, self.profession)
+        else:
+            self.ai_utils = None
+            logger.info("AI Utils cannot be initialized due to missing API key.")
 
     def check_and_initialize_settings(self):
         # Check for the existence of settings and initialize if necessary
@@ -71,7 +79,7 @@ class PomodoroApp:
         self.openai_api_key = self.api_key_manager.get_api_key()
         if self.openai_api_key:
             self.client = OpenAI(api_key=self.openai_api_key)
-            self.ai_utils = AIUtils(self.client, self.user_name, self.profession, self.company)
+            self.ai_utils = AIUtils(self.client, self.user_name, self.profession)
         else:
             self.client = None
             self.ai_utils = None
@@ -384,7 +392,7 @@ class PomodoroApp:
             logger.error(f"Error playing audio file: {e}")
 
     def fetch_motivational_quote(self, for_break=False, current_todo=""):
-        if hasattr(self, 'ai_utils'):
+        if self.ai_utils is not None:  # Check if ai_utils is initialized
             try:
                 message = self.ai_utils.fetch_motivational_quote(for_break, current_todo)
                 self.master.after(0, lambda: self.quote_var.set(message if not for_break else f"Break Time: {message}"))

@@ -89,7 +89,7 @@ class SettingsManager:
             return False
         return True
 
-    def save_settings(self):
+    def save_settings(self, callback=None):
         if not self.validate_settings():
             logger.error("Settings validation failed. Aborting save.")
             return False
@@ -97,11 +97,11 @@ class SettingsManager:
             with self.settings_file.open('w') as file:
                 json.dump(self.settings, file, indent=4)
                 logger.info("Settings saved successfully.")
-            if self.callback:
-                self.callback()
+            if callback:
+                callback()  # Execute the callback function if provided
             return True
         except Exception as e:
-            logger.error(f"Failed to save settings(save_settings): {e}")
+            logger.error(f"Failed to save settings: {e}")
             return False
 
     def get_setting(self, key, default=None):
@@ -148,7 +148,17 @@ class SettingsWindow:
             label_widget.grid(row=i, column=0, padx=10, pady=10)
             current_value = self.app.settings_manager.get_setting(setting_key, "")
 
-            if setting_key == "AI_VOICE":
+            if setting_key == "api_key":
+                entry_widget = self.ui.create_entry(frame)
+                if self.app.api_key_manager.api_key_exists():
+                    entry_widget.insert(0, "**********************")
+                else:
+                    entry_widget.insert(0, current_value)
+                entry_widget.bind("<FocusIn>", lambda event, e=entry_widget: e.delete(0, tk.END) if e.get() == "**********************" else None)
+                entry_widget.bind("<FocusOut>", lambda event, e=entry_widget: e.insert(0, "**********************") if not e.get() else None)
+                entry_widget.grid(row=i, column=1, padx=10, pady=10)
+                self.entries[setting_key] = entry_widget
+            elif setting_key == "AI_VOICE":
                 voice_combobox = ttk.Combobox(frame, values=["alloy", "echo", "fable", "onyx", "nova", "shimmer"], state="readonly", style="TCombobox")
                 voice_combobox.set(current_value)
                 voice_combobox.grid(row=i, column=1, padx=10, pady=10)
@@ -168,19 +178,21 @@ class SettingsWindow:
         self.window.destroy()  # Ensure the window is properly closed
 
     def apply_and_save_settings(self):
-        # Gather settings from UI components
+        placeholder = "**********************"
         for key, entry in self.entries.items():
-            value = entry.get()  # Assuming entry is an input field
+            value = entry.get()
             if key == "api_key":
-                self.app.api_key_manager.set_api_key(value)
+                # Skip updating the API key if the placeholder text is present
+                if value != placeholder and value:  # Ensure the field is not empty or just the placeholder
+                    self.app.api_key_manager.set_api_key(value)
             else:
                 self.app.settings_manager.update_setting(key, value)
-        
-        # Attempt to save the settings
-        success = self.app.settings_manager.save_settings()
+
+        # Pass the reinitialize_ai_utils method as a callback
+        success = self.app.settings_manager.save_settings(callback=self.app.reinitialize_ai_utils)
         if success:
             logger.info("Settings saved successfully.")
         else:
             logger.error("Failed to save settings (apply_and_save_settings)")
-        
+
         self.window.destroy()  # Close the settings window regardless of the result
