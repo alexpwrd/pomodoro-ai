@@ -39,8 +39,6 @@ class PomodoroApp:
         self.setup_sidebar()
         self.initialize_ui_elements()
 
-        self.load_api_settings()
-        # Make sure to only initialize AIUtils if client is set
         if self.client is not None:
             self.ai_utils = AIUtils(self.client, self.user_name, self.profession, self.company)
         else:
@@ -48,7 +46,11 @@ class PomodoroApp:
 
     def initialize_managers(self):
         self.api_key_manager = APIKeyManager()
-        self.settings_manager = SettingsManager(callback=self.handle_settings_change)
+        self.settings_manager = SettingsManager(callback=self.reload_user_settings)
+
+    def reload_user_settings(self):
+        """Reloads user settings from the settings manager."""
+        self.load_user_settings()
 
     def handle_settings_change(self, key, value):
         if key == "API_KEY":
@@ -444,6 +446,10 @@ class PomodoroApp:
         mins, secs = divmod(remaining_time, 60)
         self.time_var.set(f"{mins:02d}:{secs:02d}")
 
+    def collect_current_tasks(self):
+        """Collects all tasks from the todo_frame and returns them as a single comma-separated string."""
+        return ', '.join(task_label.cget("text") for task_frame in self.todo_frame.winfo_children() for task_label in task_frame.winfo_children() if isinstance(task_label, tk.Label))
+
     def start_pomodoro(self):
         if not self.running:
             self.running = True
@@ -454,9 +460,8 @@ class PomodoroApp:
             self.focus_dropdown.config(state="disabled")
             self.break_dropdown.config(state="disabled")
 
-            # Retrieve all tasks from the todo_frame
-            current_tasks = [task_label.cget("text") for task_frame in self.todo_frame.winfo_children() for task_label in task_frame.winfo_children() if isinstance(task_label, tk.Label)]
-            current_todo = ', '.join(current_tasks)  # Combine all tasks into a single string
+            # Retrieve all tasks from the todo_frame using the new method
+            current_todo = self.collect_current_tasks()  # Combine all tasks into a single string
 
             if not self.is_resuming:
                 threading.Thread(target=self.fetch_motivational_quote, args=(False, current_todo)).start()

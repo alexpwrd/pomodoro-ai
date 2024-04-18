@@ -30,18 +30,31 @@ class APIKeyManager:
         return self.key_path.read_bytes()
 
     def set_api_key(self, api_key):
-        encrypted_api_key = self.cipher.encrypt(api_key.encode())
-        with self.api_key_file.open('wb') as key_file:  # Use the Path object for consistency
-            key_file.write(encrypted_api_key)
+        try:
+            encrypted_api_key = self.cipher.encrypt(api_key.encode())
+            with self.api_key_file.open('wb') as key_file:
+                key_file.write(encrypted_api_key)
+            logger.info("API key updated successfully.")
+        except Exception as e:
+            logger.error(f"Failed to update API key: {e}")
+            return False
+        return True
 
     def get_api_key(self):
         try:
-            with self.api_key_file.open('rb') as key_file:  # Use the Path object for consistency
+            with self.api_key_file.open('rb') as key_file:
                 encrypted_api_key = key_file.read()
             return self.cipher.decrypt(encrypted_api_key).decode()
-        except (FileNotFoundError, Exception) as e:
-            logger.error(f"Error accessing the API key: {e}")
+        except FileNotFoundError:
+            logger.error("API key file not found.")
             return None
+        except InvalidToken:
+            logger.error("Failed to decrypt API key. The key file might be corrupted.")
+            return None
+        except Exception as e:
+            logger.error(f"Unexpected error accessing the API key: {e}")
+            return None
+        
 class SettingsManager:
     def __init__(self, settings_file='settings.json', callback=None):
         self.settings_file = Path(settings_file)
@@ -69,11 +82,23 @@ class SettingsManager:
             logger.error(f"Failed to load settings, reverting to defaults: {e}")
             self.create_default_settings()
 
+    def validate_settings(self):
+        valid_voices = {"alloy", "echo", "fable", "onyx", "nova", "shimmer"}
+        if self.settings['AI_VOICE'] not in valid_voices:
+            logger.error(f"Invalid AI_VOICE setting: {self.settings['AI_VOICE']}")
+            return False
+        return True
+
     def save_settings(self):
+        if not self.validate_settings():
+            logger.error("Settings validation failed. Aborting save.")
+            return
         try:
             with self.settings_file.open('w') as file:
                 json.dump(self.settings, file, indent=4)
                 logger.info("Settings saved successfully.")
+            if self.callback:
+                self.callback()
         except Exception as e:
             logger.error(f"Failed to save settings: {e}")
 
@@ -84,8 +109,8 @@ class SettingsManager:
         return self.settings.get(key, default)
 
     def update_setting(self, key, value):
+        """Update a single setting in the in-memory settings dictionary."""
         self.settings[key] = value
-        self.save_settings()
 
     def default_settings(self):
         return {
@@ -150,6 +175,11 @@ class SettingsWindow:
                 self.app.api_key_manager.set_api_key(value)
             else:
                 self.app.settings_manager.update_setting(key, value)
+        
+        if self.app.settings_manager.save_settings():
+            self.ui.show_message("Settings saved successfully.")
+        else:
+            self.ui.show_message("Failed to save settings.")
         self.window.destroy()
 
     def on_close(self):
