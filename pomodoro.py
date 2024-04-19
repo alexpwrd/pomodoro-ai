@@ -8,6 +8,7 @@ from openai import OpenAI
 import sounddevice as sd
 import soundfile as sf
 import tkinter as tk
+import numpy as np
 from tkinter import ttk, PhotoImage
 from utils.ui import UIConfig
 from utils.settings import SettingsManager, APIKeyManager, SettingsWindow
@@ -428,13 +429,39 @@ class PomodoroApp:
 
         self.update_state_indicator("break")  # Update state indicator to yellow for break time
 
+    def initialize_sound_device(self):
+        try:
+            sd._terminate()
+            sd._initialize()
+        except Exception as e:
+            logger.error(f"Error initializing sound device: {e}")
+
     def play_audio(self, file_path):
         if self.is_muted:
             logger.info("Audio playback skipped due to mute state.")
             return
+
+        # Ensure sound device is initialized
+        self.initialize_sound_device()
+
         try:
-            data, samplerate = sf.read(file_path, dtype='float32')
-            sd.play(data, samplerate)
+            # Load the audio file
+            data, fs = sf.read(file_path, dtype='float32')
+
+            # Query the default output device to get its information
+            default_device_index = sd.default.device['output']
+            default_device_info = sd.query_devices(default_device_index, 'output')
+            device_index = default_device_index
+            max_output_channels = default_device_info['max_output_channels']
+
+            logger.info(f"Using audio output device: {default_device_info['name']}, with {max_output_channels} channels")
+
+            # If the device supports more than one channel, ensure the audio is played on all channels
+            if max_output_channels > 1 and data.ndim == 1:
+                data = np.column_stack([data] * max_output_channels)
+
+            # Play the audio file
+            sd.play(data, samplerate=fs, device=device_index, blocksize=512, latency='high')
             sd.wait()  # Wait until the file has finished playing
             logger.info("Audio playback completed.")
         except Exception as e:
