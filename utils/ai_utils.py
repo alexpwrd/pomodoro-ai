@@ -36,7 +36,7 @@ class AIUtils:
                 f"Generate a motivational quote related to {theme} from a successful individual in the {self.profession} industry. This quote should inspire {self.user_name}. "
                 f"The user is working on the following task(s) during this work session:'{current_todo}'. Give tips for how to achieve these tasks.  " 
                 f"Begin the message with {self.user_name}'s name to grab their attention immediately. Follow with the quote and conclude with a brief reminder of their task, any tips you have for achieving those specific tasks, and encouraging statement that incorporates humor and irony. No coffee references. "
-                f"Design this message to be concise, engaging, and easily readable aloud by a voice assistant. The entire message should be a single, impactful paragraph that subtly blends humor/irony with motivation, without directly attributing the quote to a specific person."
+                f"Design this message to be concise, engaging, and easily readable aloud by a voice assistant. No hashtags. The entire message should be a single, impactful paragraph that subtly blends humor/irony with motivation written in a way that will be easy to say by a text to speech model."
             )
         else:
             activities = [

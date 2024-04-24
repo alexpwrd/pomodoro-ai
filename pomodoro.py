@@ -17,6 +17,8 @@ from utils.audio_utils import play_sound, toggle_mute
 from utils.ai_utils import AIUtils
 import logging
 from tkinter import simpledialog
+from utils.voice_assistant import VoiceAssistant
+import traceback
 
 
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -31,6 +33,7 @@ class PomodoroApp:
         self.ui = UIConfig()
         self.status_var = tk.StringVar(value="Ready")  # Define status_var with a default message
         self.time_var = tk.StringVar()  # Initialize the time_var
+        self.user_feedback_var = tk.StringVar(value="Press to Talk")  # Initialize user_feedback_var with a default message
         self.initialize_managers()
         self.check_and_initialize_settings()  # New method to handle first-time setup and loading
         self.load_api_settings()
@@ -40,6 +43,7 @@ class PomodoroApp:
         self.setup_window_layout()
         self.setup_sidebar()
         self.initialize_ui_elements()
+        self.voice_assistant = VoiceAssistant(self)
 
         self.work_cycles_completed = int(self.settings_manager.get_setting("WORK_CYCLES_COMPLETED", 0))
 
@@ -47,6 +51,20 @@ class PomodoroApp:
             self.ai_utils = AIUtils(self.client, self.user_name, self.profession)
         else:
             self.ai_utils = None
+
+    def update_user_feedback(self, message):
+        # Schedule the update to be run in the main thread
+        self.master.after(0, lambda: self.user_feedback_var.set(message))
+
+    def handle_talk_to_ai(self):
+        # Disable the "Talk to AI" button to prevent multiple presses during operation
+        self.talk_to_ai_button.config(state=tk.DISABLED)
+        # Proceed with handling the voice command
+        self.voice_assistant.handle_voice_command()
+
+    def enable_talk_to_ai_button(self):
+        # Re-enable the "Talk to AI" button
+        self.talk_to_ai_button.config(state=tk.NORMAL)
 
     def load_user_settings(self):
         # Load user profile settings
@@ -160,13 +178,9 @@ class PomodoroApp:
         self.sidebar.pack(expand=False, fill='y', side='left', anchor='nw')
         self.sidebar.pack_propagate(False)  # Prevent the sidebar from resizing to fit its children
 
-        # Control buttons frame for Start, Pause, and Skip
-        control_buttons_frame = tk.Frame(self.sidebar, bg=self.ui.colors["sidebar_bg"])
-        control_buttons_frame.pack(pady=10, fill='x')
-
-        # Adding Start and Skip buttons
-        self.start_button = self.ui.create_modern_button(control_buttons_frame, "Start", self.start_pomodoro)
-        self.skip_button = self.ui.create_modern_button(control_buttons_frame, "Skip", self.skip_break, state=tk.DISABLED)
+        # Adding Start and Skip buttons directly to the sidebar
+        self.start_button = self.ui.create_modern_button(self.sidebar, "Start", self.start_pomodoro)
+        self.skip_button = self.ui.create_modern_button(self.sidebar, "Skip", self.skip_break, state=tk.DISABLED)
         for button in [self.start_button, self.skip_button]:
             button.pack(side='top', pady=5)
 
@@ -199,24 +213,36 @@ class PomodoroApp:
 
         # Frame for Circle + Timer Display
         self.center_frame = tk.Frame(self.master, bg=self.ui.colors["background"])
-        self.center_frame.pack(expand=True)
+        self.center_frame.pack(expand=True, fill=tk.BOTH)
 
-        # Circle (State Indicator)
+        # Sub-frame for grouping the circle and timer horizontally
+        circle_timer_frame = tk.Frame(self.center_frame, bg=self.ui.colors["background"])
+        circle_timer_frame.pack(side='top', pady=(10, 0))
+
+        # Circle (State Indicator) within the sub-frame
         circle_diameter = 40
         canvas_size = circle_diameter + 20
-        self.state_indicator_canvas = tk.Canvas(self.center_frame, width=canvas_size, height=canvas_size, bg=self.ui.colors["background"], highlightthickness=0)
-        self.state_indicator_canvas.pack(side=tk.LEFT, pady=(10, 10), padx=(10,0))
+        self.state_indicator_canvas = tk.Canvas(circle_timer_frame, width=canvas_size, height=canvas_size, bg=self.ui.colors["background"], highlightthickness=0)
+        self.state_indicator_canvas.pack(side=tk.LEFT, padx=(10,0))
         circle_x0 = (canvas_size - circle_diameter) / 2
         circle_y0 = circle_x0
         circle_x1 = circle_x0 + circle_diameter
         circle_y1 = circle_y0 + circle_diameter
         self.state_indicator = self.state_indicator_canvas.create_oval(circle_x0, circle_y0, circle_x1, circle_y1, fill=self.ui.colors["state_indicator"]["default"])
 
-        # Timer Display
+        # Timer Display next to the circle in the same sub-frame
         self.time_var = tk.StringVar(self.master)
-        self.update_display(self.focus_length)  # Convert minutes to seconds correctly here
-        self.timer_display = tk.Label(self.center_frame, textvariable=self.time_var, font=("Helvetica", 48), bg=self.ui.colors["background"], fg=self.ui.colors["text"])
+        self.update_display(self.focus_length)  # Initial display update
+        self.timer_display = tk.Label(circle_timer_frame, textvariable=self.time_var, font=("Helvetica", 48), bg=self.ui.colors["background"], fg=self.ui.colors["text"])
         self.timer_display.pack(side=tk.LEFT, padx=(10,0))
+
+        # Add Talk to AI button directly under the sub-frame within center_frame
+        self.talk_to_ai_button = tk.Button(self.center_frame, text="Talk to AI", command=self.handle_talk_to_ai)
+        self.talk_to_ai_button.pack(side='top', pady=(10, 0))
+
+        # Add a label for user feedback directly under the "Talk to AI" button
+        self.user_feedback_label = tk.Label(self.center_frame, textvariable=self.user_feedback_var, font=("Helvetica", 14), bg=self.ui.colors["background"], fg=self.ui.colors["text"])
+        self.user_feedback_label.pack(side='top', pady=(5, 0))
 
         # Inspirational or motivational quote display
         self.quote_var = tk.StringVar(self.master, value="Welcome to AI Pomodoro, click start to begin!!")
