@@ -133,6 +133,10 @@ ENV/
 env.bak/
 venv.bak/
 
+#Other
+environment.yml
+pyproject.toml
+
 # Spyder project settings
 .spyderproject
 .spyproject
