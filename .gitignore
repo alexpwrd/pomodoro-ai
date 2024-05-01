@@ -6,6 +6,17 @@ __pycache__/
 .env
 environment.yml  # Exclude environment configuration
 
+.DS_Store
+
+.python-version
+
+pyproject.toml
+
+setup.py
+
+environment.yml
+
+
 # Package and dependency files
 pyproject.toml  # Exclude build system configuration
 
