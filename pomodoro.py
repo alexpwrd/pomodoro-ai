@@ -3,22 +3,19 @@
 import os
 import threading
 import warnings
-from pathlib import Path
 from openai import OpenAI
 import sounddevice as sd
 import soundfile as sf
 import tkinter as tk
 import numpy as np
-from tkinter import ttk, PhotoImage
+from tkinter import ttk
 from utils.ui import UIConfig
 from utils.settings import SettingsManager, APIKeyManager, SettingsWindow
 from utils.window_utils import set_window_icon
 from utils.audio_utils import play_sound, toggle_mute
 from utils.ai_utils import AIUtils
 import logging
-from tkinter import simpledialog
 from utils.voice_assistant import VoiceAssistant
-import traceback
 
 
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')

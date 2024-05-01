@@ -4,6 +4,7 @@ Enhance your productivity with this straightforward desktop application, the Pom
 
 ## Key Features
 
+- "Talk to AI" to discuss what to work on and help you plan your work sessions
 - Tailor work and break periods to your preference
 - Inspirational quotes displayed, courtesy of OpenAI
 - User-friendly graphical interface
@@ -14,49 +15,75 @@ Enhance your productivity with this straightforward desktop application, the Pom
 - macOS operating system - tested on 14.4.1
 - Python version 3.11 or above
 - Tkinter library (usually comes with Python installations on macOS)
-- openai and dotenv Python packages
+- OpenAI Python package
 - Valid OpenAI API key
 - Stable internet connection
 
-## Note for Windows and Linux Users
-
-The audible alerts feature uses the `say` command, which is specific to macOS. Windows users can replace this with the `pyttsx3` library for text-to-speech functionality, or the `winsound` module for simple beeps. Linux users might consider using `espeak` or similar for text-to-speech. Example adaptations for these platforms can be found in the documentation or comments within the `pomodoro.py` script.
-
 ## Setting Up
 
-1. Verify Python 3 is installed on your device. It's recommended to use a virtual environment such as Miniconda to manage your Python versions and packages. This helps in avoiding conflicts between package versions and requirements for different projects.
+### Step 1: Install Python
 
-2. If you're using Miniconda or another virtual environment tool, create a new environment for this project:
-   ```
-   conda create --name pomodoro python=3.11
-   conda activate pomodoro
-   ```
-   Adjust the `python=3.11` to your preferred Python version (3.11 or above).
+Ensure Python 3.11 or above is installed on your device. You can download it from [python.org](https://www.python.org/downloads/).
 
-3. Execute the following command to install necessary Python packages:
-   ```
-   pip install openai python-dotenv
-   ```
+### Step 2: Clone the Repository
 
-4. Obtain the `pomodoro.py` script by either cloning the repository or downloading it directly.
+Clone the repository to your local machine using the following command in your terminal:
 
-5. In the script's directory, create a `.env` file and insert your OpenAI API key as shown below:
-   ```
-   OPENAI_API_KEY=<your_openai_api_key_here>
-   ```
-   Ensure the `.env` file is secured and not shared publicly, as it contains sensitive information.
+```bash
+git clone https://github.com/alexpwrd/pomodoro-ai.git
+cd pomodoro-ai
+```
+
+### Step 3: Set Up the Python Environment
+
+You can use Python's built-in `venv` module to create a virtual environment:
+
+```bash
+python -m venv venv
+source venv/bin/activate # On Windows use venv\Scripts\activate
+```
+
+### Step 4: Install Required Packages
+
+Install the necessary Python packages using pip:
+
+```bash
+pip install -r requirements.txt
+```
+
+### Step 5: Obtain an OpenAI API Key
+
+To use the motivational quote feature, you need a valid OpenAI API key. Obtain one by signing up or logging into your account at [OpenAI](https://www.openai.com/), and navigating to the API section.
+
+### Step 6: Input Your OpenAI API Key
+
+Input your OpenAI API key directly into the application settings. This can typically be done through the application's settings menu or configuration file, depending on how `settings.py` is structured in the project.
 
 ## How to Use
 
-To start the Pomodoro Timer, open your terminal, change to the directory containing the `pomodoro.py` script, and execute the following command:
+### How to Use the Voice Assistant
 
-python pomodoro.py
+1. **Activate the Voice Assistant**: Click the "Talk to AI" button located in the main interface of the application. This will activate the voice assistant and it will start listening to your commands.
 
+2. **Speak Your Command**: After clicking the "Talk to AI" button, speak clearly into your microphone. The voice assistant is designed to understand natural language and can handle a variety of commands related to productivity, task management, and motivational support.
+
+3. **Receive Feedback and Guidance**: Once your command is processed, the voice assistant will provide feedback directly through the application's interface. 
+
+### Starting the Pomodoro Timer
+
+1. **Navigate to the Project Directory**: Ensure you are in the project directory where the application is located.
+
+2. **Activate the Virtual Environment**: Make sure your virtual environment is activated. If not, you can activate it using the appropriate command for your operating system.
+
+3. **Run the Application**: Execute the following command in your terminal:
+   ```bash
+   python pomodoro.py
+   ```
 
 This will launch the Pomodoro Timer application. Through its graphical interface, you can:
 
-- Set your desired focus and break durations using the dropdown menu.
-- Start, pause, or reset the timer with the corresponding buttons.
-- During breaks, the application will fetch and display an inspirational quote from OpenAI, and an audible alert will signal the start and end of each session.
+- **Set Focus and Break Durations**: Use the dropdown menu to select your desired focus and break durations.
+- **Control the Timer**: Start, pause, or reset the timer using the corresponding buttons.
+- **Get Motivated**: During breaks, the application will fetch and display an inspirational quote from OpenAI. An audible alert will also signal the start and end of each session.
 
 Enjoy enhanced productivity and motivation with your AI Pomodoro Timer!
