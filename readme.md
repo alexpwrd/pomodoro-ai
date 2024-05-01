@@ -1,6 +1,6 @@
 # Pomodoro AI 
 
-![Pomodoro AI Application Preview](/Users/vlad/Dropbox/CODE/Personal/pomodoro/resources/app-preview.png)
+![Pomodoro AI Application Preview](resources/app-preview.png)
 
 Enhance your productivity with this straightforward desktop application, the Pomodoro Timer with AI integration and voice assistant. Developed using Python and Tkinter, it not only assists in managing your work and break intervals efficiently but also keeps you motivated with uplifting quotes. Start by talking to the AI about your tasks to help you better plan your work sessions and then click "Start" to start your work session.
 
@@ -65,7 +65,7 @@ Input your OpenAI API key directly into the application settings. This can typic
 
 Here is a preview of the application settings interface where you can input your OpenAI API key and customize other settings:
 
-![Application Settings Interface](settings.png)
+![Application Settings Interface](resources/settings.png)
 
 ## How to Use
 
