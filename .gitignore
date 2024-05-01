@@ -1,54 +1,3 @@
-# Python files
-*.pyc
-__pycache__/
-
-# Environment files
-.env
-environment.yml  # Exclude environment configuration
-
-.DS_Store
-
-.python-version
-
-pyproject.toml
-
-setup.py
-
-environment.yml
-
-
-# Package and dependency files
-pyproject.toml  # Exclude build system configuration
-
-# Audio directories
-audio/
-audiofiles/
-testing/
-
-# Testing scripts and directories
-test-speechtotext.py
-testaudio-nogui.py
-testaudio.py
-voice_test.py
-testing/
-
-# Audio files
-.mp3
-.opus
-speech_output.opus
-.wav
-
-# Sensitive files
-api_key.key
-encrypted_api_key.bin
-settings.json
-
-# Ignore specific directories
-utils/__pycache__/
-
-# Setup files
-setup.py  # Exclude setup script
-
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -99,31 +48,6 @@ coverage.xml
 .hypothesis/
 .pytest_cache/
 
-# Translations
-*.mo
-*.pot
-
-# Django stuff:
-*.log
-local_settings.py
-db.sqlite3
-db.sqlite3-journal
-
-# Flask stuff:
-instance/
-.webassets-cache
-
-# Scrapy stuff:
-.scrapy
-
-# Sphinx documentation
-docs/_build/
-build/doctrees
-docstrees/
-
-# PyBuilder
-target/
-
 # Jupyter Notebook
 .ipynb_checkpoints
 
@@ -131,13 +55,16 @@ target/
 profile_default/
 ipython_config.py
 
+# PyBuilder
+target/
+
 # pyenv
 .python-version
 
 # pipenv
 #Pipfile.lock
 
-# PEP 582; used by e.g. github.com/David-OConnor/pyflow
+# PEP 582; used by e.g., github.com/David-OConnor/pyflow
 __pypackages__/
 
 # Celery stuff
@@ -155,10 +82,6 @@ venv/
 ENV/
 env.bak/
 venv.bak/
-
-#Other
-environment.yml
-pyproject.toml
 
 # Spyder project settings
 .spyderproject
@@ -192,3 +115,68 @@ cython_debug/
 
 # Visual Studio Code settings
 .vscode/
+
+# Python files
+*.pyc
+
+# Environment files
+.env
+environment.yml  # Exclude environment configuration
+
+# Package and dependency files
+pyproject.toml  # Exclude build system configuration
+
+# Audio directories
+audio/
+audiofiles/
+testing/
+
+# Testing scripts and directories
+test-speechtotext.py
+testaudio-nogui.py
+testaudio.py
+voice_test.py
+testing/
+
+# Audio files
+.mp3
+.opus
+speech_output.opus
+.wav
+
+# Sensitive files
+api_key.key
+encrypted_api_key.bin
+settings.json
+
+# Ignore specific directories
+utils/__pycache__/
+
+# Setup files
+setup.py  # Exclude setup script
+
+# Django stuff:
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+
+# Flask stuff:
+instance/
+.webassets-cache
+
+# Scrapy stuff:
+.scrapy
+
+# Sphinx documentation
+docs/_build/
+build/doctrees
+docstrees/
+
+# Docker ignore
+**/node_modules
+**/npm-debug.log
+**/yarn-error.log
+docker-compose*.yml
+*Dockerfile*
+*.dockerignore
