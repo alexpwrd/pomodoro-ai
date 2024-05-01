@@ -9,6 +9,18 @@ environment.yml  # Exclude environment configuration
 # Package and dependency files
 pyproject.toml  # Exclude build system configuration
 
+# Audio directories
+audio/
+audiofiles/
+testing/
+
+# Testing scripts and directories
+test-speechtotext.py
+testaudio-nogui.py
+testaudio.py
+voice_test.py
+testing/
+
 # Audio files
 .mp3
 .opus

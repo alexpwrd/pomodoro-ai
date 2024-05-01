@@ -108,14 +108,19 @@ class PomodoroApp:
 
     def check_and_initialize_settings(self):
         # Check for the existence of settings and initialize if necessary
-        settings_exist = self.settings_manager.settings_exist()
-
-        if not settings_exist:
-            logger.info("First-time setup required. Initializing default settings.")
-            self.settings_manager.create_default_settings()
-        
-        # Load settings without checking for API key
-        self.load_user_settings()
+        try:
+            settings_exist = self.settings_manager.settings_exist()
+            if not settings_exist:
+                logger.info("First-time setup required. Initializing default settings.")
+                self.settings_manager.create_default_settings()
+            else:
+                logger.info("Loading existing settings.")
+            
+            # Load settings without checking for API key
+            self.load_user_settings()
+            logger.info("User settings loaded successfully.")
+        except Exception as e:
+            logger.error(f"Failed to initialize or load settings: {e}")
 
     def load_api_settings(self):
         self.openai_api_key = self.api_key_manager.get_api_key()
@@ -125,7 +130,7 @@ class PomodoroApp:
         else:
             self.client = None
             self.ai_utils = None
-            logger.info("API Key is not set. Please set your API key for full functionality.")
+            logger.info("API Key is not set. Proceeding without AI functionalities.")
 
     def initialize_timing(self):
         self.focus_options = [1, 15, 25, 50, 90]  # in minutes
@@ -496,8 +501,10 @@ class PomodoroApp:
     def fetch_motivational_quote(self, for_break=False, current_todo=""):
         def thread_target():
             if self.ai_utils is None:
-                self.master.after(0, lambda: self.quote_var.set("AI functionalities are not available."))
-                logger.warning("AI Utils is not initialized or available.")
+                # Provide feedback directly on the UI that AI functionalities are not available
+                self.master.after(0, lambda: self.quote_var.set("AI functionalities are not available without an API key."))
+                self.master.after(0, lambda: self.status_var.set("AI features disabled. Set an API key in settings to enable."))
+                logger.info("AI functionalities are not available without an API key.")
                 return
 
             try:

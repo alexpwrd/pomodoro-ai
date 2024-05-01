@@ -99,7 +99,7 @@ class VoiceAssistant:
             return ""
 
     def text_to_speech(self, text):
-        user_voice = "shimmer"  # Example voice, adjust as needed
+        user_voice = "onyx"  # Example voice, adjust as needed
         speech_file_path = os.path.join(self.audiofiles_dir, 'speech_output.opus')
         try:
             response = self.client.audio.speech.create(
