@@ -1,8 +1,6 @@
 cryptography==42.0.5
 numpy==1.26.4
 openai==1.25.0
-python-dotenv==1.0.1
-setuptools==69.1.1
 sounddevice==0.4.6
 soundfile==0.12.1
 webrtcvad==2.0.10
