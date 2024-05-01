@@ -121,10 +121,10 @@ cython_debug/
 
 # Environment files
 .env
-environment.yml  # Exclude environment configuration
+environment.yml  
 
 # Package and dependency files
-pyproject.toml  # Exclude build system configuration
+pyproject.toml 
 
 # Audio directories
 audio/
@@ -153,7 +153,7 @@ settings.json
 utils/__pycache__/
 
 # Setup files
-setup.py  # Exclude setup script
+setup.py
 
 # Django stuff:
 *.log
