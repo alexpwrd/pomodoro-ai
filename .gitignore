@@ -45,7 +45,7 @@ nosetests.xml
 coverage.xml
 *.cover
 *.py,cover
-.hypothesis/
+hypothesis/
 .pytest_cache/
 
 # Jupyter Notebook
