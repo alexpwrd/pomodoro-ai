@@ -1,6 +1,8 @@
-# Pomodoro Timer with Motivational Quotes
+# Pomodoro AI 
 
-Enhance your productivity with this straightforward desktop application, the Pomodoro Timer. Developed using Python and Tkinter, it not only assists in managing your work and break intervals efficiently but also keeps you motivated with uplifting quotes.
+![Pomodoro AI Application Preview](/Users/vlad/Dropbox/CODE/Personal/pomodoro/resources/app-preview.png)
+
+Enhance your productivity with this straightforward desktop application, the Pomodoro Timer with AI integration and voice assistant. Developed using Python and Tkinter, it not only assists in managing your work and break intervals efficiently but also keeps you motivated with uplifting quotes. Start by talking to the AI about your tasks to help you better plan your work sessions and then click "Start" to start your work session.
 
 ## Key Features
 
@@ -58,6 +60,12 @@ To use the motivational quote feature, you need a valid OpenAI API key. Obtain o
 ### Step 6: Input Your OpenAI API Key
 
 Input your OpenAI API key directly into the application settings. This can typically be done through the application's settings menu or configuration file, depending on how `settings.py` is structured in the project.
+
+## Application Settings Interface
+
+Here is a preview of the application settings interface where you can input your OpenAI API key and customize other settings:
+
+![Application Settings Interface](settings.png)
 
 ## How to Use
 
