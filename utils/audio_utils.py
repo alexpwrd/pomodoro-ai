@@ -3,18 +3,13 @@ import os
 import platform
 
 def play_sound(for_break=False):
-    """Plays a sound indicating the end of a work or break period based on the OS."""
+    """Indicates the end of a work or break period based on the OS."""
     if platform.system() == "Windows":
-        import winsound
-        if for_break:
-            winsound.Beep(440, 1000)  # Example frequency and duration for break
-        else:
-            winsound.Beep(550, 1000)  # Example frequency and duration for work
+        # Removed beep sound for Windows
+        print("Break time." if for_break else "Focus time.")
     else:  # macOS and Linux
-        if for_break:
-            os.system('say -v Tessa "Break time."')
-        else:
-            os.system('say -v Tessa "Focus time."')
+        # Removed voice commands for macOS and Linux
+        print("Break time." if for_break else "Focus time.")
 
 def toggle_mute(is_muted, update_button_style, mute_button):
     is_muted = not is_muted
