@@ -9,7 +9,7 @@ import logging
 from utils.settings import APIKeyManager  # Adjust the import path as necessary
 
 # Setup logging
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 class VoiceAssistant:
     def __init__(self, app):

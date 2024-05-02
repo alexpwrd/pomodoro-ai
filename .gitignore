@@ -180,3 +180,12 @@ docstrees/
 docker-compose*.yml
 *Dockerfile*
 *.dockerignore
+
+# Docker volumes
+docker_volumes/
+
+# Docker temp files
+*.docker_temp
+
+# Docker network files
+docker_networks/
