@@ -32,11 +32,25 @@ git clone https://github.com/alexpwrd/pomodoro-ai.git
 cd pomodoro-ai
 ```
 
-### 3. Create a Virtual Environment (Optional)
-Creating a virtual environment is optional but recommended to manage dependencies separately from your global Python installation. If you choose to create one, use Python's `venv` and name it `pomodoro-ai-env`:
+### 3. Create a Virtual Environment
+Creating a virtual environment is optional but recommended to manage dependencies separately from your global Python installation.
+
+
+#### Using Python's venv
+
 ```bash
 python -m venv pomodoro-ai-env
 source pomodoro-ai-env/bin/activate # Use pomodoro-ai-env\Scripts\activate on Windows
+```
+
+#### Using Miniconda
+
+If you prefer using Miniconda, first ensure that Miniconda is installed on your system. You can download it from [Miniconda's website](https://docs.conda.io/en/latest/miniconda.html). Then create and activate the environment:
+
+
+```bash
+conda create --name pomodoro-ai-env python=3.11
+conda activate pomodoro-ai-env
 ```
 
 ### 4. Install Dependencies
