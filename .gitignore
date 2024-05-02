@@ -189,3 +189,5 @@ docker_volumes/
 
 # Docker network files
 docker_networks/
+
+pomodoro-ai-env/
