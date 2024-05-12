@@ -27,59 +27,58 @@ Download and install Python 3.11 or higher from [python.org](https://www.python.
 
 ### 2. Clone the Repository
 Clone and navigate to the repository:
-```bash
+ ```bash
 git clone https://github.com/alexpwrd/pomodoro-ai.git
 cd pomodoro-ai
-```
+ ```
 
 ### 3. Create a Virtual Environment
 Creating a virtual environment is optional but recommended to manage dependencies separately from your global Python installation.
 
-
 #### Using Python's venv
 
-```bash
+  ```bash
 python -m venv pomodoro-ai-env
-source pomodoro-ai-env/bin/activate # Use pomodoro-ai-env\Scripts\activate on Windows
-```
+source pomodoro-ai-env/bin/activate # Use pomodoro-ai-env Scripts activate on Windows
+ ```
 
 #### Using Miniconda
 
 If you prefer using Miniconda, first ensure that Miniconda is installed on your system. You can download it from [Miniconda's website](https://docs.conda.io/en/latest/miniconda.html). Then create and activate the environment:
 
-
-```bash
+ ```bash
 conda create --name pomodoro-ai-env python=3.11
 conda activate pomodoro-ai-env
-```
+ ```
 
-### 4. Install Dependencies
-Install all required packages:
-```bash
-pip install -r requirements.txt
-```
-### 5. Install PortAudio
-Install PortAudio. This is required by the sounddevice library to stream audio from your computer's microphone.
+### 4. Install PortAudio
+Install PortAudio. This is required by the sounddevice library to stream audio.
 
 #### For macOS:
-```bash
+ ```bash
 brew install portaudio
-```
+ ```
 
 #### For Debian / Ubuntu Linux:
 
-```bash
+ ```bash
 sudo apt-get install portaudio19-dev
-```
+ ```
 
 #### Windows:
 Windows may work without having to install PortAudio explicitly (it will get installed with sounddevice).
 
+### 5. Install Dependencies
+Install all required packages:
+```bash
+pip install -r requirements.txt
+```
+
 ### 6. Run the Application
 Start the application with:
-```bash
+ ```bash
 python pomodoro.py # or python3 pomodoro.py
-```
+ ```
 
 ### 7. Obtain an OpenAI API Key
 Get an OpenAI API key by signing up at [OpenAI](https://www.openai.com/).
@@ -110,7 +109,7 @@ After setting up and configuring the application, you can start using it by foll
      ```
    - On Windows:
      ```bash
-     pomodoro-ai-env\Scripts\activate
+     pomodoro-ai-env Scripts activate
      ```
 
 3. **Navigate to the Project Directory**:
@@ -138,3 +137,5 @@ This will launch the Pomodoro AI application, and you can start using the featur
 - **Motivation**: Get motivational quotes during breaks and audible alerts for session transitions.
 
 Enjoy a more productive workflow with your AI-enhanced Pomodoro Timer!
+
+
