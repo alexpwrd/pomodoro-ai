@@ -148,8 +148,14 @@ class VoiceAssistant:
                 transcription = self.transcribe_audio()
                 
                 if transcription:
+                    # Update chat history with user input
+                    self.app.update_chat_history("user", transcription)
+
                     # Generate a response based on the transcribed text.
                     response = self.generate_response(transcription)
+                    
+                    # Update chat history with AI response
+                    self.app.update_chat_history("assistant", response)
                     
                     # Update the GUI to inform the user that the system is speaking the response.
                     self.app.update_user_feedback("Speaking...")

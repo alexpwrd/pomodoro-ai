@@ -160,8 +160,8 @@ class PomodoroApp:
         except Exception as e:
             logger.error(f"Failed to set window icon: {e}")
         self.master.configure(bg=self.ui.colors["background"])
-        window_width, window_height = 800, 500
-        
+        window_width, window_height = 800, 800  # Adjust these values as needed
+            
         screen_width, screen_height = self.master.winfo_screenwidth(), self.master.winfo_screenheight()
         x = int((screen_width / 2) - (window_width / 2))  # Center the window horizontally
         y = 0  # Position the window at the top of the screen
@@ -207,6 +207,15 @@ class PomodoroApp:
         for button in [self.mute_button, self.reset_button, self.settings_button]:
             button.pack(side='top', pady=5)
 
+    def update_chat_history(self, role, message):
+        self.chat_history.config(state=tk.NORMAL)
+        if role == "user":
+            self.chat_history.insert(tk.END, f"You: {message}\n")
+        elif role == "assistant":
+            self.chat_history.insert(tk.END, f"AI: {message}\n")
+        self.chat_history.config(state=tk.DISABLED)
+        self.chat_history.see(tk.END)
+
     def initialize_ui_elements(self):
         # Progress bar for showing the current session's progress
         self.progress = ttk.Progressbar(self.master, orient="horizontal", mode="determinate", maximum=self.focus_length)
@@ -245,6 +254,15 @@ class PomodoroApp:
         # Add a label for user feedback directly under the "Talk to AI" button
         self.user_feedback_label = tk.Label(self.center_frame, textvariable=self.user_feedback_var, font=("Helvetica", 14), bg=self.ui.colors["background"], fg=self.ui.colors["text"])
         self.user_feedback_label.pack(side='top', pady=(5, 0))
+
+        # Add Chat History Text Widget
+        self.chat_history_frame = tk.Frame(self.master, bg=self.ui.colors["background"])
+        self.chat_history_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=(10, 20))
+        self.chat_history_label = tk.Label(self.chat_history_frame, text="Chat History", font=("Helvetica", 14, "bold"), bg=self.ui.colors["background"], fg=self.ui.colors["text"])
+        self.chat_history_label.pack(anchor='w')
+        self.chat_history = tk.Text(self.chat_history_frame, wrap=tk.WORD, state=tk.DISABLED, bg=self.ui.colors["background"], fg=self.ui.colors["text"], font=("Helvetica", 12))
+        self.chat_history.pack(fill=tk.BOTH, expand=True)
+        self.chat_history.config(state=tk.DISABLED)
 
         # Inspirational or motivational quote display
         self.quote_var = tk.StringVar(self.master, value="Welcome to AI Pomodoro, click start to begin!!")
