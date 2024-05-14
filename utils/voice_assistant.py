@@ -7,6 +7,7 @@ import numpy as np
 import webrtcvad
 import logging
 from utils.settings import APIKeyManager  # Adjust the import path as necessary
+import json
 
 # Setup logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -87,8 +88,11 @@ class VoiceAssistant:
 
     def generate_response(self, text):
         try:
+            # Add the user's message to the conversation history
             self.conversation_history.append({"role": "user", "content": text})
+            logging.info('Generating response...')
 
+            # Call the OpenAI API to generate a response
             response = self.client.chat.completions.create(
                 model="gpt-4-turbo",
                 messages=self.conversation_history,
@@ -109,32 +113,40 @@ class VoiceAssistant:
                                 "required": ["text"]
                             }
                         }
-                    },
+                    }
                 ],
                 tool_choice="auto",
             )
-            tool_call = response.choices[0].message.tool_calls[0]
 
-            # Access the 'function' attribute, then the 'arguments' attribute
+            # Check if tool calls are present in the response
+            if response.choices and response.choices[0].message and response.choices[0].message.tool_calls:
+                tool_call = response.choices[0].message.tool_calls[0]
+            else:
+                # If no tool calls are present, return the content of the response message
+                assistant_message = response.choices[0].message.content
+                self.conversation_history.append({"role": "assistant", "content": assistant_message})
+                return assistant_message
+
+            # Extract the function name and arguments
+            function_name = tool_call.function.name
             arguments = tool_call.function.arguments
-            name = tool_call.function.name
 
-            # Since the arguments are a JSON-formatted string, you need to parse them
-            import json
+            # Parse the JSON-formatted arguments
             arguments_dict = json.loads(arguments)
 
-            # Now you can access the 'text' field within the parsed arguments
-            text = arguments_dict["text"]
+            # Access the 'text' field within the parsed arguments
+            response_text = arguments_dict["text"]
 
-            if 'respond' in name:
-                self.conversation_history.append({"role": "assistant", "content": text})
-                
-            return text
+            # Check if the function name matches 'respond' and update the conversation history
+            if function_name == 'respond':
+                self.conversation_history.append({"role": "assistant", "content": response_text})
+
+            return response_text
 
         except Exception as e:
             logging.error(f"Error generating response: {e}")
             return ""
-
+    
     def text_to_speech(self, text):
         user_voice = "onyx"  # Example voice, adjust as needed
         speech_file_path = os.path.join(self.audiofiles_dir, 'speech_output.opus')
