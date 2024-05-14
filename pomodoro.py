@@ -160,8 +160,8 @@ class PomodoroApp:
         except Exception as e:
             logger.error(f"Failed to set window icon: {e}")
         self.master.configure(bg=self.ui.colors["background"])
-        window_width, window_height = 800, 500
-        
+        window_width, window_height = 800, 800
+            
         screen_width, screen_height = self.master.winfo_screenwidth(), self.master.winfo_screenheight()
         x = int((screen_width / 2) - (window_width / 2))  # Center the window horizontally
         y = 0  # Position the window at the top of the screen
@@ -207,6 +207,37 @@ class PomodoroApp:
         for button in [self.mute_button, self.reset_button, self.settings_button]:
             button.pack(side='top', pady=5)
 
+    def update_chat_history(self, role, message):
+        self.chat_history.config(state=tk.NORMAL)
+        if role == "user":
+            self.chat_history.insert(tk.END, f"You: {message}\n")
+        elif role == "assistant":
+            self.chat_history.insert(tk.END, f"AI: {message}\n")
+        elif role == "system":
+            self.chat_history.insert(tk.END, f"System: {message}\n")
+        self.chat_history.config(state=tk.DISABLED)
+        self.chat_history.see(tk.END)
+
+        # Ensure the conversation history is updated for the AI
+        if self.voice_assistant:
+            self.voice_assistant.conversation_history.append({"role": role, "content": message})
+            logging.info(f"Updated chat history: {role} - {message}")
+    
+    def handle_send_message(self):
+        user_input = self.chat_input.get().strip()
+        if user_input:
+            # Update chat history with user input
+            self.update_chat_history("user", user_input)
+
+            # Get AI response (example implementation, replace with actual AI call)
+            ai_response = self.voice_assistant.generate_response(user_input)
+
+            # Update chat history with AI response
+            self.update_chat_history("assistant", ai_response)
+
+            # Clear the input field
+            self.chat_input.delete(0, tk.END)
+
     def initialize_ui_elements(self):
         # Progress bar for showing the current session's progress
         self.progress = ttk.Progressbar(self.master, orient="horizontal", mode="determinate", maximum=self.focus_length)
@@ -245,6 +276,30 @@ class PomodoroApp:
         # Add a label for user feedback directly under the "Talk to AI" button
         self.user_feedback_label = tk.Label(self.center_frame, textvariable=self.user_feedback_var, font=("Helvetica", 14), bg=self.ui.colors["background"], fg=self.ui.colors["text"])
         self.user_feedback_label.pack(side='top', pady=(5, 0))
+
+        # Add Chat History Frame
+        self.chat_history_frame = tk.Frame(self.master, bg=self.ui.colors["background"])
+        self.chat_history_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=(10, 20))
+
+        # Chat History Label
+        self.chat_history_label = tk.Label(self.chat_history_frame, text="Chat History", font=("Helvetica", 14, "bold"), bg=self.ui.colors["background"], fg=self.ui.colors["text"])
+        self.chat_history_label.pack(anchor='w')
+
+        # Chat History Text Widget
+        self.chat_history = tk.Text(self.chat_history_frame, wrap=tk.WORD, state=tk.DISABLED, bg=self.ui.colors["background"], fg=self.ui.colors["text"], font=("Helvetica", 12))
+        self.chat_history.pack(fill=tk.BOTH, expand=True)
+        
+        # Chat Input Frame at the bottom of the chat history
+        self.chat_input_frame = tk.Frame(self.chat_history_frame, bg=self.ui.colors["background"])
+        self.chat_input_frame.pack(fill=tk.X, pady=(10, 0))
+
+        # Chat Input Entry
+        self.chat_input = tk.Entry(self.chat_input_frame, font=("Helvetica", 12))
+        self.chat_input.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 10))
+
+        # Send Button
+        self.send_button = tk.Button(self.chat_input_frame, text="Send", command=self.handle_send_message)
+        self.send_button.pack(side=tk.RIGHT)
 
         # Inspirational or motivational quote display
         self.quote_var = tk.StringVar(self.master, value="Welcome to AI Pomodoro, click start to begin!!")
@@ -319,6 +374,9 @@ class PomodoroApp:
             delete_button = self.create_button(task_frame, "✖", lambda: task_frame.destroy(), "button")
             delete_button.pack(side=tk.RIGHT)
 
+            # Update chat history with the new task for the AI's context
+            self.update_chat_history("system", f"Adding task: {task_text}")
+
             self.task_input.delete(0, tk.END)
         else:
             messagebox.showerror("Error", "No task to add")
@@ -334,6 +392,9 @@ class PomodoroApp:
         # Recreate the label in the new frame with a suitable color to indicate completion
         completed_task_label = tk.Label(completed_task_frame, text=task_label.cget("text"), font=("Helvetica", 16), fg="green", bg=self.ui.colors["background"])
         completed_task_label.pack(side=tk.LEFT, fill=tk.X, expand=True)
+
+        # Add removal of task to the AI's chat history
+        self.update_chat_history("system", f"Removing task: {task_label}")
 
         # Destroy the old frame in the To Do section
         task_frame.destroy()
