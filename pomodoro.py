@@ -213,8 +213,15 @@ class PomodoroApp:
             self.chat_history.insert(tk.END, f"You: {message}\n")
         elif role == "assistant":
             self.chat_history.insert(tk.END, f"AI: {message}\n")
+        elif role == "system":
+            self.chat_history.insert(tk.END, f"System: {message}\n")
         self.chat_history.config(state=tk.DISABLED)
         self.chat_history.see(tk.END)
+
+        # Ensure the conversation history is updated for the AI
+        if self.voice_assistant:
+            self.voice_assistant.conversation_history.append({"role": role, "content": message})
+            logging.info(f"Updated chat history: {role} - {message}")
     
     def handle_send_message(self):
         user_input = self.chat_input.get().strip()
@@ -367,6 +374,9 @@ class PomodoroApp:
             delete_button = self.create_button(task_frame, "✖", lambda: task_frame.destroy(), "button")
             delete_button.pack(side=tk.RIGHT)
 
+            # Update chat history with the new task for the AI's context
+            self.update_chat_history("system", f"Adding task: {task_text}")
+
             self.task_input.delete(0, tk.END)
         else:
             messagebox.showerror("Error", "No task to add")
@@ -382,6 +392,9 @@ class PomodoroApp:
         # Recreate the label in the new frame with a suitable color to indicate completion
         completed_task_label = tk.Label(completed_task_frame, text=task_label.cget("text"), font=("Helvetica", 16), fg="green", bg=self.ui.colors["background"])
         completed_task_label.pack(side=tk.LEFT, fill=tk.X, expand=True)
+
+        # Add removal of task to the AI's chat history
+        self.update_chat_history("system", f"Removing task: {task_label}")
 
         # Destroy the old frame in the To Do section
         task_frame.destroy()
