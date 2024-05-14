@@ -88,14 +88,49 @@ class VoiceAssistant:
     def generate_response(self, text):
         try:
             self.conversation_history.append({"role": "user", "content": text})
+
             response = self.client.chat.completions.create(
                 model="gpt-4-turbo",
-                messages=self.conversation_history
+                messages=self.conversation_history,
+                tools=[
+                    {
+                        "type": "function",
+                        "function": {
+                            "name": "respond",
+                            "description": "Respond to the user",
+                            "parameters": {
+                                "type": "object",
+                                "properties": {
+                                    "text": {
+                                        "type": "string",
+                                        "description": "The text response to the user's query"
+                                    }
+                                },
+                                "required": ["text"]
+                            }
+                        }
+                    },
+                ],
+                tool_choice="auto",
             )
-            generated_response = response.choices[0].message.content
-            self.conversation_history.append({"role": "assistant", "content": generated_response})
-            logging.info(f"Generated response: {generated_response}")
-            return generated_response
+            tool_call = response.choices[0].message.tool_calls[0]
+
+            # Access the 'function' attribute, then the 'arguments' attribute
+            arguments = tool_call.function.arguments
+            name = tool_call.function.name
+
+            # Since the arguments are a JSON-formatted string, you need to parse them
+            import json
+            arguments_dict = json.loads(arguments)
+
+            # Now you can access the 'text' field within the parsed arguments
+            text = arguments_dict["text"]
+
+            if 'respond' in name:
+                self.conversation_history.append({"role": "assistant", "content": text})
+                
+            return text
+
         except Exception as e:
             logging.error(f"Error generating response: {e}")
             return ""
