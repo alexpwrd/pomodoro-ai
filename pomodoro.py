@@ -160,7 +160,7 @@ class PomodoroApp:
         except Exception as e:
             logger.error(f"Failed to set window icon: {e}")
         self.master.configure(bg=self.ui.colors["background"])
-        window_width, window_height = 800, 800  # Adjust these values as needed
+        window_width, window_height = 800, 800
             
         screen_width, screen_height = self.master.winfo_screenwidth(), self.master.winfo_screenheight()
         x = int((screen_width / 2) - (window_width / 2))  # Center the window horizontally
