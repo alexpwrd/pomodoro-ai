@@ -11,17 +11,15 @@ logger = logging.getLogger(__name__)
 class APIKeyManager:
     def __init__(self, key_path="api_key.key", api_key_file='encrypted_api_key.bin'):
         self.key_path = Path(key_path)
-        self.api_key_file = Path(api_key_file)  # Initialize the api_key_file attribute here
+        self.api_key_file = Path(api_key_file)
         if not self.key_path.exists():
             self.initialize_key()
         self.cipher = Fernet(self.load_key())
 
     def api_key_exists(self):
-        # Check if the encrypted API key file exists
         return self.api_key_file.exists()
 
     def initialize_key(self):
-        # Generate and save a new encryption key
         key = Fernet.generate_key()
         with self.key_path.open('wb') as key_file:
             key_file.write(key)
@@ -58,15 +56,14 @@ class APIKeyManager:
 class SettingsManager:
     def __init__(self, settings_file='settings.json', callback=None):
         self.settings_file = Path(settings_file)
-        self.settings = {}  # Initialize as an empty dictionary
-        self.load_settings()  # Load settings immediately upon initialization
+        self.settings = {}
+        self.load_settings()
         self.callback = callback
 
     def settings_exist(self):
         return self.settings_file.exists()
 
     def create_default_settings(self):
-        # Set the default settings and save them to the file
         self.settings = self.default_settings()
         self.save_settings()
 
@@ -98,7 +95,7 @@ class SettingsManager:
                 json.dump(self.settings, file, indent=4)
                 logger.info("Settings saved successfully.")
             if callback:
-                callback()  # Execute the callback function if provided
+                callback()
             return True
         except Exception as e:
             logger.error(f"Failed to save settings: {e}")
@@ -111,7 +108,6 @@ class SettingsManager:
         return self.settings.get(key, default)
 
     def update_setting(self, key, value):
-        """Update a single setting in the in-memory settings dictionary."""
         self.settings[key] = value
 
     def default_settings(self):
@@ -121,15 +117,15 @@ class SettingsManager:
             "AI_VOICE": "alloy",
             "FOCUS_TIME": 25,  
             "BREAK_TIME": 5,  
-            "WORK_CYCLES_COMPLETED": 0, 
+            "WORK_CYCLES_COMPLETED": 0,
+            "AI_SCREEN_VISION": False
         }
-
 
 class SettingsWindow:
     def __init__(self, master, app):
         self.master = master
         self.app = app
-        self.ui = app.ui  # Assume UIConfig is initialized in the main app class
+        self.ui = app.ui
         self.window = tk.Toplevel(master)
         self.create_widgets()
         self.window.protocol("WM_DELETE_WINDOW", self.on_close)
@@ -144,16 +140,16 @@ class SettingsWindow:
             "AI Voice": "AI_VOICE",
             "OpenAI API Key": "api_key",
             "Focus Time (min)": "FOCUS_TIME", 
-            "Break Time (min)": "BREAK_TIME",  
+            "Break Time (min)": "BREAK_TIME",
+            "AI Screen Vision": "AI_SCREEN_VISION"
         }
         self.entries = {}
 
-     # Define a uniform width for entry and combobox widgets for alignment
         entry_width = 30
 
         for i, (label, setting_key) in enumerate(settings.items()):
             label_widget = self.ui.create_label(frame, text=f"{label}:")
-            label_widget.grid(row=i, column=0, padx=(10, 20), pady=10, sticky="e")  # Right-align labels with increased padding
+            label_widget.grid(row=i, column=0, padx=(10, 20), pady=10, sticky="e")
 
             if setting_key == "api_key":
                 entry_widget = self.ui.create_entry(frame, width=entry_width)
@@ -170,42 +166,49 @@ class SettingsWindow:
                 options = [1, 15, 25, 50, 90] if setting_key == "FOCUS_TIME" else [1, 5, 10, 15]
                 entry_widget = ttk.Combobox(frame, values=options, state="readonly", width=entry_width)
                 entry_widget.set(self.app.settings_manager.get_setting(setting_key, ""))
+            elif setting_key == "AI_SCREEN_VISION":
+                entry_widget = ttk.Checkbutton(frame, text="Enable")
+                entry_widget.state(['!alternate'])
+                if self.app.settings_manager.get_setting(setting_key, False):
+                    entry_widget.state(['selected'])
+                else:
+                    entry_widget.state(['!selected'])
             else:
                 entry_widget = self.ui.create_entry(frame, width=entry_width)
                 entry_widget.insert(0, self.app.settings_manager.get_setting(setting_key, ""))
 
-            # Left-align entries with increased right padding
             entry_widget.grid(row=i, column=1, padx=(10, 20), pady=10, sticky="w")
             self.entries[setting_key] = entry_widget
 
-        # Create a separate frame for the save button to control its size and positioning
         button_frame = ttk.Frame(frame, style="TFrame")
         button_frame.grid(row=len(settings), column=1, sticky="e", padx=(5, 20), pady=20)
         save_button = self.ui.create_modern_button(button_frame, text="Save", command=self.apply_and_save_settings)
-        save_button.pack(pady=5, padx=5)  # Use pack within the button frame for better control
+        save_button.pack(pady=5, padx=5)
 
     def on_close(self):
-        # Handle any necessary cleanup or final actions
         logger.info("Closing settings window.")
-        self.window.destroy()  # Ensure the window is properly closed
+        self.window.destroy()
 
     def apply_and_save_settings(self):
         placeholder = "**********************"
         for key, entry in self.entries.items():
-            value = entry.get()
             if key == "api_key":
-                # Skip updating the API key if the placeholder text is present
-                if value != placeholder and value:  # Ensure the field is not empty or just the placeholder
+                value = entry.get()
+                if value != placeholder and value:
                     self.app.api_key_manager.set_api_key(value)
+            elif key == "AI_SCREEN_VISION":
+                value = 'selected' in entry.state()
             else:
+                value = entry.get()
+            
+            if key != "api_key" or (key == "api_key" and value != placeholder and value):
                 self.app.settings_manager.update_setting(key, value)
 
-        # Pass the reinitialize_ai_utils method as a callback
         success = self.app.settings_manager.save_settings()
         if success:
             logger.info("Settings saved successfully.")
-            self.app.update_timer_settings()  # This method needs to be implemented in PomodoroApp
+            self.app.update_timer_settings()
         else:
             logger.error("Failed to save settings (apply_and_save_settings)")
 
-        self.window.destroy()  # Close the settings window regardless of the result
+        self.window.destroy()

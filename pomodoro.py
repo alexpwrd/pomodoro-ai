@@ -1,5 +1,13 @@
 # pomodoro.py is the main file that runs the pomodoro application
 
+"""
+Copyright (c) 2024, Alex Glebov
+This code is licensed under the Creative Commons Attribution-NonCommercial 4.0 International License.
+To view a copy of this license, visit http://creativecommons.org/licenses/by-nc/4.0/
+"""
+
+
+
 import os
 import threading
 import warnings
@@ -48,6 +56,12 @@ class PomodoroApp:
             self.ai_utils = AIUtils(self.client, self.user_name, self.profession)
         else:
             self.ai_utils = None
+
+        master.protocol("WM_DELETE_WINDOW", self.on_closing)
+
+    def on_closing(self):
+        self.voice_assistant.db.close()
+        self.master.destroy()
 
     def update_user_feedback(self, message):
         # Schedule the update to be run in the main thread
