@@ -49,7 +49,7 @@ class VoiceAssistant:
             {"role": "system", "content": (
                 "As a voice-activated personal productivity coach AI within a Pomodoro app, your primary role is to enhance the user's productivity and time management skills with extremely brief, spoken responses. "
                 "Limit each response to a single, concise sentence that captures the most crucial point or question. "
-                "When shown a screenshot, quickly identify distractions like social media and remind the user to focus on their main task. "
+                "You can sometimes see the users screen when they include a screen shot in the message, if asked, tell the user what you see on the screen. When shown a screenshot, quickly identify distractions like social media and remind the user to focus on their main task. "
                 "Greet users by asking what they'd like to work on today, and feel free to ask for their name to personalize future interactions. "
                 "Use the conversation history to tailor your brief suggestions and questions about their projects and tasks. "
                 "Guide users in planning effective 25-minute work sessions and 5-minute breaks, aiming for four sessions in a 2-hour cycle. "
@@ -168,8 +168,13 @@ class VoiceAssistant:
                 ]
                 messages[-1] = current_message
                 logging.info("Screenshot included in the current request")
+                logging.info(f"Screenshot base64 length: {len(screenshot_base64)}")
+                logging.info(f"First 50 characters of base64: {screenshot_base64[:50]}...")
             else:
                 logging.info("No screenshot included in the request")
+
+            # Log a summary of the final message structure
+            logging.info(f"Final message structure: {self.summarize_messages(messages)}")
 
             response = self.client.chat.completions.create(
                 model="gpt-4o-mini",
@@ -191,6 +196,19 @@ class VoiceAssistant:
         except Exception as e:
             logging.error(f"Error generating response: {e}")
             return ""
+
+    def summarize_messages(self, messages):
+        """Summarize the message structure without including full content."""
+        return [
+            {
+                "role": msg["role"],
+                "content_type": (
+                    "text" if isinstance(msg["content"], str) 
+                    else [item["type"] for item in msg["content"]]
+                )
+            }
+            for msg in messages
+        ]
 
     @timer
     def text_to_speech(self, text):
