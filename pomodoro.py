@@ -6,8 +6,6 @@ This code is licensed under the Creative Commons Attribution-NonCommercial 4.0 I
 To view a copy of this license, visit http://creativecommons.org/licenses/by-nc/4.0/
 """
 
-
-
 import os
 import threading
 import warnings
@@ -49,6 +47,8 @@ class PomodoroApp:
         self.setup_sidebar()
         self.initialize_ui_elements()
         self.voice_assistant = VoiceAssistant(self)
+        self.long_break_length = int(self.settings_manager.get_setting("LONG_BREAK_TIME", 15)) * 60  # 15 minutes default
+
 
         self.work_cycles_completed = int(self.settings_manager.get_setting("WORK_CYCLES_COMPLETED", 0))
 
@@ -487,49 +487,49 @@ class PomodoroApp:
         self.initialize_sound_device()
 
         try:
-            # Load the audio file
-            data, fs = sf.read(file_path, dtype='float32')
+            with self.voice_assistant.audio_lock:
+                data, fs = sf.read(file_path, dtype='float32')
+                default_device_index = sd.default.device['output']
+                default_device_info = sd.query_devices(default_device_index, 'output')
+                device_index = default_device_index
+                max_output_channels = default_device_info['max_output_channels']
 
-            # Query the default output device to get its information
-            default_device_index = sd.default.device['output']
-            default_device_info = sd.query_devices(default_device_index, 'output')
-            device_index = default_device_index
-            max_output_channels = default_device_info['max_output_channels']
+                logger.info(f"Using audio output device: {default_device_info['name']}, with {max_output_channels} channels")
 
-            logger.info(f"Using audio output device: {default_device_info['name']}, with {max_output_channels} channels")
+                if max_output_channels > 1 and data.ndim == 1:
+                    data = np.column_stack([data] * max_output_channels)
 
-            # If the device supports more than one channel, ensure the audio is played on all channels
-            if max_output_channels > 1 and data.ndim == 1:
-                data = np.column_stack([data] * max_output_channels)
-
-            # Play the audio file
-            sd.play(data, samplerate=fs, device=device_index, blocksize=512, latency='high')
-            sd.wait()  # Wait until the file has finished playing
-            logger.info("Audio playback completed.")
+                sd.play(data, samplerate=fs, device=device_index, blocksize=512, latency='high')
+                sd.wait()
+                logger.info("Audio playback completed.")
         except Exception as e:
             logger.error(f"Error playing audio file: {e}")
 
-    def fetch_motivational_quote(self, for_break=False, current_todo=""):
+    def fetch_motivational_quote(self, for_break=False, current_todo="", is_long_break=False):
+        if hasattr(self, 'quote_thread') and self.quote_thread.is_alive():
+            logger.info("A quote is already being fetched. Skipping this request.")
+            return
+
         def thread_target():
             if self.ai_utils is None:
-                # Provide feedback directly on the UI that AI functionalities are not available
                 self.master.after(0, lambda: self.quote_var.set("AI functionalities are not available without an API key."))
                 self.master.after(0, lambda: self.status_var.set("AI features disabled. Set an API key in settings to enable."))
                 logger.info("AI functionalities are not available without an API key.")
                 return
 
             try:
-                message = self.ai_utils.fetch_motivational_quote(for_break, current_todo)
-                self.master.after(0, lambda: self.quote_var.set(message if not for_break else f"Break Time: {message}"))
+                message = self.ai_utils.fetch_motivational_quote(for_break, current_todo, is_long_break)
+                break_type = "Long Break" if is_long_break else "Break"
+                self.master.after(0, lambda: self.quote_var.set(message if not for_break else f"{break_type} Time: {message}"))
                 self.master.after(0, lambda: self.status_var.set("Speaking..."))
                 self.speak_quote(message)
             except Exception as e:
                 self.master.after(0, lambda: self.quote_var.set("Error fetching quote. Please check your connection."))
                 logger.error(f"Error fetching motivational quote: {e}")
 
-        quote_thread = threading.Thread(target=thread_target)
-        quote_thread.daemon = True
-        quote_thread.start()
+        self.quote_thread = threading.Thread(target=thread_target)
+        self.quote_thread.daemon = True
+        self.quote_thread.start()
 
 
     def text_to_speech(self, text):
@@ -625,22 +625,20 @@ class PomodoroApp:
         logger.info("Timer resumed.")
 
     def reset_pomodoro(self):
-        self.reload_user_settings()  # Reload settings at the start of the break
+        self.reload_user_settings()
         self.running = False
-        self.current_cycle = 0
         self.is_focus_time = True
-        self.remaining_time = int(self.focus_length)  # Ensure it's an integer
-        logger.debug(f"Updating display with remaining_time: {self.remaining_time} (type: {type(self.remaining_time)})")
+        self.remaining_time = int(self.focus_length)
         self.update_display(self.remaining_time)
         self.start_button.config(text="Start", command=self.start_pomodoro, state=tk.NORMAL)
         self.reset_button.config(state=tk.DISABLED)
-        # self.break_button.config(state=tk.NORMAL)
-        self.skip_button.config(state=tk.DISABLED)  # Disable the skip button when resetting the timer
+        self.skip_button.config(state=tk.DISABLED)
         self.is_resuming = False 
         self.progress["value"] = 0
         self.update_state_indicator("default")
         self.work_sessions_completed = 0
         self.break_sessions_completed = 0
+        self.update_work_cycles_display()
         logger.info("Timer reset.")
 
     def pomodoro_timer(self):
@@ -650,39 +648,89 @@ class PomodoroApp:
             self.progress["value"] = self.progress["maximum"] - self.remaining_time
             self.master.after(1000, self.pomodoro_timer)
         elif self.running:
-            self.switch_mode()
+            if not self.is_focus_time:
+                if self.work_sessions_completed == 0:  # This indicates the end of a long break
+                    self.end_long_break()
+                else:
+                    self.switch_mode()
+            else:
+                self.switch_mode()
 
     def switch_mode(self):
-        self.reload_user_settings()  # Reload settings at the start of the break
-        self.running = False  # Stop the current timer
+        self.reload_user_settings()
+        self.running = False
         if self.is_focus_time:
             play_sound(for_break=True)
             self.work_sessions_completed += 1
             if self.work_sessions_completed >= self.max_work_sessions:
-                self.work_sessions_completed = 0  # Reset work sessions
-                self.work_cycles_completed += 1  # Increment work cycles counter
-                self.settings_manager.update_setting("WORK_CYCLES_COMPLETED", self.work_cycles_completed)  # Save the new counter
-                self.settings_manager.save_settings()  # Make sure to save settings to file
-                self.update_work_cycles_display()  # Update UI with the new work cycles count
-                self.reset_pomodoro()  # Reset if maximum work sessions are reached
+                # Completed a full work cycle
+                self.work_cycles_completed += 1
+                self.work_sessions_completed = 0  # Reset work sessions counter
+                self.settings_manager.update_setting("WORK_CYCLES_COMPLETED", self.work_cycles_completed)
+                self.settings_manager.save_settings()
+                self.update_work_cycles_display()
+                self.start_long_break()
                 return
             self.is_focus_time = False
             self.remaining_time = self.short_break
             self.update_state_indicator("break")
             self.work_session_label.config(text=f"Work: {self.work_sessions_completed}/{self.max_work_sessions}")
-            self.start_break()  # Start the break session
+            self.start_break()
         else:
             play_sound(for_break=False)
             self.break_sessions_completed += 1
             if self.break_sessions_completed >= self.max_break_sessions:
-                self.reset_pomodoro()  # Reset if maximum break sessions are reached
+                self.reset_pomodoro()
                 return
             self.is_focus_time = True
             self.remaining_time = self.focus_length
             self.update_state_indicator("focus")
             self.break_session_label.config(text=f"Breaks: {self.break_sessions_completed}/{self.max_break_sessions}")
-            self.start_pomodoro()  # Start the focus session
+            self.start_pomodoro()
 
+    def start_long_break(self):
+        self.is_focus_time = False
+        self.remaining_time = self.long_break_length
+        self.update_display(self.remaining_time)
+        self.progress["maximum"] = self.long_break_length
+        self.progress["value"] = 0
+        self.update_state_indicator("long_break")
+
+        current_tasks = self.collect_current_tasks()
+        self.fetch_motivational_quote(for_break=True, current_todo=current_tasks, is_long_break=True)
+
+        self.start_button.config(state=tk.DISABLED)
+        self.reset_button.config(state=tk.DISABLED)
+        self.skip_button.config(state=tk.NORMAL)
+
+        self.running = True
+        self.pomodoro_timer()
+
+    def end_long_break(self):
+        self.running = False
+        self.is_focus_time = True
+        self.remaining_time = self.focus_length
+        self.update_display(self.remaining_time)
+        self.progress["maximum"] = self.focus_length
+        self.progress["value"] = 0
+        self.update_state_indicator("default")
+
+        self.start_button.config(text="Start New Cycle", command=self.start_pomodoro, state=tk.NORMAL)
+        self.reset_button.config(state=tk.NORMAL)
+        self.skip_button.config(state=tk.DISABLED)
+
+        self.work_sessions_completed = 0
+        self.break_sessions_completed = 0
+        self.update_work_cycles_display()
+
+        # Display a message to the user
+        self.quote_var.set("Long break completed. Click 'Start New Cycle' when you're ready to begin the next work session.")
+
+    def update_work_cycles_display(self):
+        self.work_cycles_label.config(text=f"Work Cycles: {self.work_cycles_completed}")
+        self.work_session_label.config(text=f"Work: {self.work_sessions_completed}/{self.max_work_sessions}")
+
+    
     def update_state_indicator(self, state):
         color = self.ui.colors["state_indicator"].get(state, self.ui.colors["state_indicator"]["default"])
         self.state_indicator_canvas.itemconfig(self.state_indicator, fill=color)

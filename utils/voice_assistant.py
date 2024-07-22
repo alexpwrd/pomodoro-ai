@@ -36,6 +36,7 @@ class VoiceAssistant:
         self.db = ConversationDatabase()
         self.max_history_length = 500
         self.load_conversation_history()
+        self.audio_lock = threading.Lock()
 
     def load_conversation_history(self):
         history = self.db.get_conversation_history(self.max_history_length)
@@ -210,9 +211,9 @@ class VoiceAssistant:
                 logging.info("No screenshot included in the request")
 
             response = self.client.chat.completions.create(
-                model="gpt-4o",
+                model="gpt-4o-mini",
                 messages=messages,
-                max_tokens=300
+                max_tokens=2000
             )
             
             generated_response = response.choices[0].message.content
@@ -236,31 +237,37 @@ class VoiceAssistant:
             logging.warning("Empty text provided for text-to-speech conversion. Skipping.")
             return
 
-        user_voice = "onyx"  # Example voice, adjust as needed
+        user_voice = self.app.settings_manager.get_setting("AI_VOICE", "onyx")
+        valid_voices = {"alloy", "echo", "fable", "onyx", "nova", "shimmer"}
+
+        if user_voice not in valid_voices:
+            logging.error(f"Invalid voice setting '{user_voice}'. Using default 'onyx'.")
+            user_voice = "onyx"
+
         try:
-            response = self.client.audio.speech.create(
-                model="tts-1",
-                voice=user_voice,
-                input=text,
-                response_format="opus"
-            )
-            # Convert the response content to a byte stream
-            audio_stream = io.BytesIO(response.content)
-            
-            logging.info("Text to speech conversion successful")
-            self.play_audio_from_stream(audio_stream)
+            with self.audio_lock:
+                response = self.client.audio.speech.create(
+                    model="tts-1",
+                    voice=user_voice,
+                    input=text,
+                    response_format="opus"
+                )
+                audio_stream = io.BytesIO(response.content)
+                logging.info("Text to speech conversion successful")
+                self.play_audio_from_stream(audio_stream)
         except Exception as e:
             logging.error(f"Error in text-to-speech conversion: {e}")
 
     @timer
     def play_audio_from_stream(self, audio_stream):
-        try:
-            data, fs = sf.read(audio_stream, dtype='float32')
-            sd.play(data, samplerate=fs)
-            sd.wait()
-            logging.info("Audio playback completed.")
-        except Exception as e:
-            logging.error(f"Error playing audio stream: {e}")
+        with self.audio_lock:
+            try:
+                data, fs = sf.read(audio_stream, dtype='float32')
+                sd.play(data, samplerate=fs)
+                sd.wait()
+                logging.info("Audio playback completed.")
+            except Exception as e:
+                logging.error(f"Error playing audio stream: {e}")
 
     @timer
     def handle_voice_command(self):
