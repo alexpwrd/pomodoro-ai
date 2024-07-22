@@ -11,9 +11,13 @@ import mss
 from PIL import Image
 import base64
 import io
+import tempfile
 from datetime import datetime
 import time
 from utils.database import ConversationDatabase
+from pydub import AudioSegment
+from pydub.utils import make_chunks
+import queue
 
 # Setup logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -36,28 +40,24 @@ class VoiceAssistant:
         self.db = ConversationDatabase()
         self.max_history_length = 10
         self.load_conversation_history()
+        self.stream_active = False
+        self.volume = 1.0
 
     def load_conversation_history(self):
         history = self.db.get_conversation_history(self.max_history_length)
         self.conversation_history = [
             {"role": "system", "content": (
-                "As a personal productivity coach AI, your primary role is to assist the user in enhancing "
-                "their productivity and time management skills to successfully complete their tasks while being brief and conversational in your response. "
-                "When seeing a screenshot of what they see on their main screen, you can use this information to help them complete their tasks more efficiently. If you see destractions like social media, be sure to remind them to focus on their main task. "
-                "Your responses should be brief in the same way a conversation would be brief between two humans. When greeting the user, ask what they would like to work on today? "
-                "Feel free to ask for the user's name, "
-                "and use this information to personalize the conversation based on prior interactions stored in the conversational history. "
-                "You are not limited to offering general advice; you are also equipped to engage in detailed planning based on the user's specific goals. "
-                "Proactively ask insightful questions about their current projects, upcoming tasks, and their approach to tackling them, "
-                "tailoring your suggestions to their previous responses and progress. "
-                "You appear as a clickable button within a Pomodoro AI app, which the user uses to initiate conversations with you. "
-                "This app also features a timer for 25-minute focused work sessions followed by 5-minute breaks, aiming for the user "
-                "to complete four sessions to achieve a full work cycle of 2 hours. "
-                "Your interactions should guide the user in planning their work sessions effectively. Offer tangible, proven productivity strategies "
-                "and tailor your suggestions to fit within the framework of the Pomodoro technique. "
-                "Ensure your responses are clear, concise, and conversational. Maintain a tone that is friendly, funny, playful, and supportive, "
-                "encouraging a productive and enjoyable work experience. Always remember to keep your responses brief and to the point, "
-                "and do not hesitate to ask the user questions that will aid in their task completion."
+                "As a voice-activated personal productivity coach AI within a Pomodoro app, your primary role is to enhance the user's productivity and time management skills with extremely brief, spoken responses. "
+                "Limit each response to a single, concise sentence that captures the most crucial point or question. "
+                "When shown a screenshot, quickly identify distractions like social media and remind the user to focus on their main task. "
+                "Greet users by asking what they'd like to work on today, and feel free to ask for their name to personalize future interactions. "
+                "Use the conversation history to tailor your brief suggestions and questions about their projects and tasks. "
+                "Guide users in planning effective 25-minute work sessions and 5-minute breaks, aiming for four sessions in a 2-hour cycle. "
+                "Offer quick, tangible productivity strategies within the Pomodoro framework. "
+                "Don't offer lists, only response as a single conversational sentence."
+                "Maintain a friendly, funny, playful, and supportive tone while being incredibly succinct. "
+                "If more detail is needed, prompt the user to ask a follow-up question instead of providing a lengthy answer. "
+                "Remember, your entire response must fit within one sentence, focusing on the most important aspect of productivity or task completion."
             )}
         ]
         for role, content in reversed(history):
@@ -107,55 +107,17 @@ class VoiceAssistant:
             return None
 
     @timer
-    def record_audio_vad(self, filename="output.wav", fs=48000, vad_mode=3, frame_duration=10, silence_duration=500, max_duration=20000):
+    def record_audio_vad(self, filename="output.wav", fs=44100, duration=5):
         filename = os.path.join(self.audiofiles_dir, filename)
-        logging.info("Starting recording with VAD...")
-        vad = webrtcvad.Vad(vad_mode)
-        device_info = sd.query_devices(kind='input')
-        max_channels = device_info['max_input_channels']
-        if max_channels < 1:
-            logging.error("Default device does not support the required number of channels.")
-            raise ValueError("Default device does not support the required number of channels.")
+        logging.info("Starting recording...")
         
         try:
-            with sd.InputStream(samplerate=fs, channels=1, dtype='int16') as stream:
-                audio_data = []
-                silent_frames = 0
-                speech_frames = 0
-                num_silent_frames_to_stop = int(silence_duration / frame_duration)
-                max_frames = int(max_duration / frame_duration)
-                frames_recorded = 0
-                
-                while frames_recorded < max_frames:
-                    frame, overflowed = stream.read(int(fs * frame_duration / 1000))
-                    frames_recorded += 1
-                    is_speech = vad.is_speech(frame.tobytes(), fs)
-                    if is_speech:
-                        audio_data.extend(frame)
-                        silent_frames = 0
-                        speech_frames += 1
-                    else:
-                        silent_frames += 1
-                        if speech_frames > 0:  # Only add silence after we've detected speech
-                            audio_data.extend(frame)
-                    if silent_frames > num_silent_frames_to_stop and speech_frames > 0:
-                        logging.info(f"Silence detected after speech, stopping recording.")
-                        break
-                    if frames_recorded % 100 == 0:  # Log every second
-                        logging.info(f"Recording in progress... {frames_recorded * frame_duration / 1000:.1f} seconds")
-                
-                if frames_recorded >= max_frames:
-                    logging.info("Maximum recording duration reached.")
-                elif speech_frames == 0:
-                    logging.info("No speech detected, stopping recording.")
+            recording = sd.rec(int(duration * fs), samplerate=fs, channels=1, device=self.input_device)
+            sd.wait()
             
-            if speech_frames > 0:
-                sf.write(filename, np.array(audio_data), fs)
-                logging.info(f"Recording stopped and saved to file. Duration: {len(audio_data) / fs:.2f} seconds")
-                return True
-            else:
-                logging.info("No audio saved as no speech was detected.")
-                return False
+            sf.write(filename, recording, fs)
+            logging.info(f"Recording finished and saved to {filename}")
+            return True
         except Exception as e:
             logging.error(f"Error during recording: {e}")
             return False
@@ -248,45 +210,100 @@ class VoiceAssistant:
                 model="tts-1",
                 voice=user_voice,
                 input=text,
-                response_format="opus"
+                response_format="mp3"
             )
-            audio_stream = io.BytesIO(response.content)
             logging.info("Text to speech conversion successful")
-            self.play_audio_from_stream(audio_stream)
+            self.play_audio_from_stream(response)
         except Exception as e:
             logging.error(f"Error in text-to-speech conversion: {e}")
 
     @timer
-    def play_audio_from_stream(self, audio_stream):
-        try:
-            data, fs = sf.read(audio_stream, dtype='float32')
-            sd.play(data, samplerate=fs, device=sd.default.device['output'])
-            sd.wait()
-            logging.info("Audio playback completed.")
-        except Exception as e:
-            logging.error(f"Error playing audio stream: {e}")
+    def play_audio_from_stream(self, response):
+        CHUNK_SIZE = 4096  # 4 KB chunks
+
+        def download_thread():
+            try:
+                buffer = io.BytesIO()
+                total_bytes = 0
+                for chunk in response.iter_bytes(chunk_size=CHUNK_SIZE):
+                    buffer.write(chunk)
+                    total_bytes += len(chunk)
+                
+                buffer.seek(0)
+                audio = AudioSegment.from_mp3(buffer)
+                logging.info(f"Download complete. Total bytes: {total_bytes}")
+                return audio
+            except Exception as e:
+                logging.error(f"Error in download thread: {e}")
+                return None
+
+        def playback_thread(audio):
+            try:
+                if audio is None:
+                    return
+
+                logging.info("Playback started")
+                samples = np.array(audio.get_array_of_samples())
+                samples = (samples * self.volume).astype(np.int16)
+                
+                sd.play(samples, audio.frame_rate)
+                sd.wait()
+                
+                logging.info(f"Audio playback completed. Total samples: {len(samples)}")
+            except Exception as e:
+                logging.error(f"Error in playback thread: {e}")
+
+        # Download the entire audio stream
+        audio = download_thread()
+
+        # Play the audio only after it's fully downloaded
+        if audio:
+            playback_thread(audio)
+        else:
+            logging.error("Failed to download audio stream")
+
+    def stop_audio_playback(self):
+        self.stream_active = False
+        sd.stop()
+        logging.info("Audio playback stopped.")
+
+    def set_volume(self, volume):
+        self.volume = max(0.0, min(1.0, volume))
+        logging.info(f"Volume set to {self.volume}")
 
     @timer
     def handle_voice_command(self):
         def background_task():
+            timings = {}
             try:
-                start_time = time.time()
                 self.app.update_user_feedback("Listening...")
+                
+                # Record audio (don't time this)
                 speech_detected = self.record_audio_vad()
                 
                 if not speech_detected:
                     self.app.update_user_feedback("No speech detected. Try again.")
+                    logging.warning("No speech detected during recording.")
                     return
 
                 self.app.update_user_feedback("Thinking...")
+                
+                # Transcribe audio
+                transcribe_start = time.time()
                 transcription = self.transcribe_audio()
+                timings['transcription'] = time.time() - transcribe_start
                 
                 if transcription:
                     screenshot_base64 = None
                     if self.app.settings_manager.get_setting("AI_SCREEN_VISION", False):
                         self.app.update_user_feedback("Looking at screen...")
                         logging.info("AI Screen Vision is enabled. Looking at screen...")
+                        
+                        # Capture screenshot
+                        screenshot_start = time.time()
                         screenshot_base64 = self.capture_screenshot()
+                        timings['screenshot'] = time.time() - screenshot_start
+                        
                         if screenshot_base64:
                             logging.info("Screenshot captured successfully")
                         else:
@@ -294,25 +311,50 @@ class VoiceAssistant:
                     else:
                         logging.info("AI Screen Vision is disabled. No screenshot captured.")
                     
+                    # Generate response
+                    response_start = time.time()
                     response = self.generate_response(transcription, screenshot_base64)
+                    timings['response_generation'] = time.time() - response_start
                     
                     self.app.update_user_feedback("Speaking...")
-                    self.text_to_speech(response)
                     
-                    end_time = time.time()
-                    total_time = end_time - start_time
-                    logging.info(f"Total voice command process time: {total_time:.2f} seconds")
+                    # Text to speech conversion (don't include playback time)
+                    tts_start = time.time()
+                    tts_response = self.client.audio.speech.create(
+                        model="tts-1",
+                        voice=self.app.settings_manager.get_setting("AI_VOICE", "onyx"),
+                        input=response,
+                        response_format="mp3"
+                    )
+                    timings['text_to_speech'] = time.time() - tts_start
+                    
+                    # Play audio (don't time this)
+                    self.play_audio_from_stream(tts_response)
                     
                     self.app.master.after(1000, lambda: self.app.update_user_feedback("Press to Talk"))
                 else:
                     logging.error("No transcription result.")
                     self.app.update_user_feedback("Try speaking again.")
             except Exception as e:
-                logging.error(f"Error handling voice command: {e}")
+                logging.error(f"Error handling voice command: {e}", exc_info=True)
                 self.app.update_user_feedback("Error. Check log.")
             finally:
                 self.app.master.after(0, lambda: self.app.user_feedback_var.set("Press to Talk"))
                 self.app.enable_talk_to_ai_button()
+                
+                # Log summary of timings
+                total_processing_time = sum(timings.values())
+                logging.info("\nVoice Command Processing Summary:")
+                logging.info(f"Total processing time: {total_processing_time:.2f} seconds")
+                for step, duration in timings.items():
+                    percentage = (duration / total_processing_time) * 100
+                    logging.info(f"  {step:<20}: {duration:6.2f} seconds ({percentage:5.1f}%)")
 
         thread = threading.Thread(target=background_task)
         thread.start()
+
+    def update_audio_devices(self, input_device, output_device):
+        self.input_device = input_device
+        self.output_device = output_device
+        sd.default.device = (input_device, output_device)
+        logging.info(f"Audio devices updated. Input: {input_device}, Output: {output_device}")
