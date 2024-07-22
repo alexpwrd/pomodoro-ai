@@ -487,21 +487,10 @@ class PomodoroApp:
         self.initialize_sound_device()
 
         try:
-            with self.voice_assistant.audio_lock:
-                data, fs = sf.read(file_path, dtype='float32')
-                default_device_index = sd.default.device['output']
-                default_device_info = sd.query_devices(default_device_index, 'output')
-                device_index = default_device_index
-                max_output_channels = default_device_info['max_output_channels']
-
-                logger.info(f"Using audio output device: {default_device_info['name']}, with {max_output_channels} channels")
-
-                if max_output_channels > 1 and data.ndim == 1:
-                    data = np.column_stack([data] * max_output_channels)
-
-                sd.play(data, samplerate=fs, device=device_index, blocksize=512, latency='high')
-                sd.wait()
-                logger.info("Audio playback completed.")
+            data, fs = sf.read(file_path, dtype='float32')
+            sd.play(data, samplerate=fs, device=sd.default.device['output'])
+            sd.wait()
+            logger.info("Audio playback completed.")
         except Exception as e:
             logger.error(f"Error playing audio file: {e}")
 

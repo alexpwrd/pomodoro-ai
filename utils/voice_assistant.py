@@ -34,9 +34,8 @@ class VoiceAssistant:
         self.audiofiles_dir = os.path.join(os.path.dirname(__file__), '..', 'audiofiles')
         self.client = OpenAI(api_key=APIKeyManager().get_api_key())
         self.db = ConversationDatabase()
-        self.max_history_length = 500
+        self.max_history_length = 10
         self.load_conversation_history()
-        self.audio_lock = threading.Lock()
 
     def load_conversation_history(self):
         history = self.db.get_conversation_history(self.max_history_length)
@@ -245,29 +244,27 @@ class VoiceAssistant:
             user_voice = "onyx"
 
         try:
-            with self.audio_lock:
-                response = self.client.audio.speech.create(
-                    model="tts-1",
-                    voice=user_voice,
-                    input=text,
-                    response_format="opus"
-                )
-                audio_stream = io.BytesIO(response.content)
-                logging.info("Text to speech conversion successful")
-                self.play_audio_from_stream(audio_stream)
+            response = self.client.audio.speech.create(
+                model="tts-1",
+                voice=user_voice,
+                input=text,
+                response_format="opus"
+            )
+            audio_stream = io.BytesIO(response.content)
+            logging.info("Text to speech conversion successful")
+            self.play_audio_from_stream(audio_stream)
         except Exception as e:
             logging.error(f"Error in text-to-speech conversion: {e}")
 
     @timer
     def play_audio_from_stream(self, audio_stream):
-        with self.audio_lock:
-            try:
-                data, fs = sf.read(audio_stream, dtype='float32')
-                sd.play(data, samplerate=fs)
-                sd.wait()
-                logging.info("Audio playback completed.")
-            except Exception as e:
-                logging.error(f"Error playing audio stream: {e}")
+        try:
+            data, fs = sf.read(audio_stream, dtype='float32')
+            sd.play(data, samplerate=fs, device=sd.default.device['output'])
+            sd.wait()
+            logging.info("Audio playback completed.")
+        except Exception as e:
+            logging.error(f"Error playing audio stream: {e}")
 
     @timer
     def handle_voice_command(self):
