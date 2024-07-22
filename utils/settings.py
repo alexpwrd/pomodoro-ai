@@ -5,6 +5,7 @@ from cryptography.fernet import Fernet
 import logging
 from utils.ui import UIConfig
 import json
+import sounddevice as sd
 
 logger = logging.getLogger(__name__)
 
@@ -118,7 +119,9 @@ class SettingsManager:
             "FOCUS_TIME": 25,  
             "BREAK_TIME": 5,  
             "WORK_CYCLES_COMPLETED": 0,
-            "AI_SCREEN_VISION": False
+            "AI_SCREEN_VISION": False,
+            "INPUT_DEVICE": None,  # Default to system default
+            "OUTPUT_DEVICE": None,  # Default to system default
         }
 
 class SettingsWindow:
@@ -141,7 +144,9 @@ class SettingsWindow:
             "OpenAI API Key": "api_key",
             "Focus Time (min)": "FOCUS_TIME", 
             "Break Time (min)": "BREAK_TIME",
-            "AI Screen Vision": "AI_SCREEN_VISION"
+            "AI Screen Vision": "AI_SCREEN_VISION",
+            "Input Device": "INPUT_DEVICE",
+            "Output Device": "OUTPUT_DEVICE"
         }
         self.entries = {}
 
@@ -173,6 +178,19 @@ class SettingsWindow:
                     entry_widget.state(['selected'])
                 else:
                     entry_widget.state(['!selected'])
+            elif setting_key in ["INPUT_DEVICE", "OUTPUT_DEVICE"]:
+                devices = sd.query_devices()
+                if setting_key == "INPUT_DEVICE":
+                    device_names = [d['name'] for d in devices if d['max_input_channels'] > 0]
+                else:  # OUTPUT_DEVICE
+                    device_names = [d['name'] for d in devices if d['max_output_channels'] > 0]
+                device_names.insert(0, "System Default")  # Add default option
+                entry_widget = ttk.Combobox(frame, values=device_names, state="readonly", width=entry_width)
+                current_device = self.app.settings_manager.get_setting(setting_key)
+                if current_device in device_names:
+                    entry_widget.set(current_device)
+                else:
+                    entry_widget.set("System Default")
             else:
                 entry_widget = self.ui.create_entry(frame, width=entry_width)
                 entry_widget.insert(0, self.app.settings_manager.get_setting(setting_key, ""))

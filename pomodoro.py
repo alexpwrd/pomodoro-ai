@@ -22,6 +22,8 @@ from utils.audio_utils import play_sound, toggle_mute
 from utils.ai_utils import AIUtils
 import logging
 from utils.voice_assistant import VoiceAssistant
+from pydub import AudioSegment
+from pydub.playback import play
 
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -47,6 +49,8 @@ class PomodoroApp:
         self.setup_sidebar()
         self.initialize_ui_elements()
         self.voice_assistant = VoiceAssistant(self)
+        self.voice_assistant.set_volume(1.0)  # Set initial volume to maximum
+        self.update_audio_devices()
         self.long_break_length = int(self.settings_manager.get_setting("LONG_BREAK_TIME", 15)) * 60  # 15 minutes default
 
 
@@ -104,6 +108,7 @@ class PomodoroApp:
         else:
             self.ai_utils = None
             logger.info("AI Utils cannot be initialized due to missing API key.")
+        self.update_audio_devices()
 
     def handle_settings_change(self, key, value):
         if key == "API_KEY":
@@ -471,25 +476,33 @@ class PomodoroApp:
 
         self.update_state_indicator("break")  # Update state indicator to yellow for break time
 
-    def initialize_sound_device(self):
-        try:
-            sd._terminate()
-            sd._initialize()
-        except Exception as e:
-            logger.error(f"Error initializing sound device: {e}")
+    def update_audio_devices(self):
+        input_device = self.settings_manager.get_setting("INPUT_DEVICE")
+        output_device = self.settings_manager.get_setting("OUTPUT_DEVICE")
+        
+        if input_device and input_device != "System Default":
+            sd.default.device['input'] = int(input_device) if input_device.isdigit() else input_device
+        else:
+            sd.default.device['input'] = sd.default.device[0]  # Use system default input
+
+        if output_device and output_device != "System Default":
+            sd.default.device['output'] = int(output_device) if output_device.isdigit() else output_device
+        else:
+            sd.default.device['output'] = sd.default.device[1]  # Use system default output
+        
+        # Update VoiceAssistant's audio devices
+        self.voice_assistant.update_audio_devices(sd.default.device['input'], sd.default.device['output'])
+        
+        logger.info(f"Audio devices updated. Input: {sd.default.device['input']}, Output: {sd.default.device['output']}")
 
     def play_audio(self, file_path):
         if self.is_muted:
             logger.info("Audio playback skipped due to mute state.")
             return
 
-        # Ensure sound device is initialized
-        self.initialize_sound_device()
-
         try:
-            data, fs = sf.read(file_path, dtype='float32')
-            sd.play(data, samplerate=fs, device=sd.default.device['output'])
-            sd.wait()
+            audio = AudioSegment.from_file(file_path, format="mp3")
+            play(audio)
             logger.info("Audio playback completed.")
         except Exception as e:
             logger.error(f"Error playing audio file: {e}")
@@ -511,7 +524,7 @@ class PomodoroApp:
                 break_type = "Long Break" if is_long_break else "Break"
                 self.master.after(0, lambda: self.quote_var.set(message if not for_break else f"{break_type} Time: {message}"))
                 self.master.after(0, lambda: self.status_var.set("Speaking..."))
-                self.speak_quote(message)
+                self.voice_assistant.text_to_speech(message)
             except Exception as e:
                 self.master.after(0, lambda: self.quote_var.set("Error fetching quote. Please check your connection."))
                 logger.error(f"Error fetching motivational quote: {e}")
@@ -520,41 +533,6 @@ class PomodoroApp:
         self.quote_thread.daemon = True
         self.quote_thread.start()
 
-
-    def text_to_speech(self, text):
-        """Converts text to speech and saves as an audio file using the user's preferred voice."""
-        if self.is_muted:
-            logger.info("Text-to-speech skipped due to mute state.")
-            return
-        user_voice = self.settings_manager.get_setting("AI_VOICE", "onyx")
-        valid_voices = {"alloy", "echo", "fable", "onyx", "nova", "shimmer"}
-
-        if user_voice not in valid_voices:
-            logger.error(f"Invalid voice setting '{user_voice}'. Using default 'onyx'.")
-            user_voice = "onyx"
-
-        script_dir = os.path.dirname(__file__)
-        speech_file_path = os.path.join(script_dir, 'speech_output.opus')
-
-        try:
-            response = self.client.audio.speech.create(
-                model="tts-1",
-                voice=user_voice,
-                input=text,
-                response_format="opus"
-            )
-            response.stream_to_file(speech_file_path)
-            self.play_audio(speech_file_path)  
-        except Exception as e:
-            logger.error(f"Error in text-to-speech conversion: {e}")
-            
-    def speak_quote(self, message):
-        if not self.is_muted:
-            if hasattr(self, 'text_to_speech'):
-                self.text_to_speech(message)
-            else:
-                logger.warning("text_to_speech method is not available.")
-        self.master.after(0, lambda: self.status_var.set(""))
 
     def update_display(self, seconds):
         minutes = seconds // 60
@@ -728,13 +706,14 @@ class PomodoroApp:
     def handle_toggle_mute(self):
         self.is_muted = not self.is_muted
         if self.is_muted:
-            # Stop any ongoing audio playback
-            sd.stop()
+            self.stop_audio_playback()
             self.mute_button.config(text="Unmute")
         else:
             self.mute_button.config(text="Mute")
-        # Update the mute button style based on the new mute state
         self.ui.update_mute_button_style(self.is_muted)
+
+    def stop_audio_playback(self):
+        self.voice_assistant.stop_audio_playback()
 
     def update_work_cycles_display(self):
         # Assuming you have a label for displaying work cycles, similar to work_session_label

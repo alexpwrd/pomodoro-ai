@@ -19,10 +19,10 @@ class AIUtils:
         
         if not for_break:
             prompt = (
-                f"Generate a motivational quote related to {theme} from a successful individual in the {self.profession} industry. This quote should inspire {self.user_name}. "
+                f"Generate a short motivational quote related to {theme} from a successful individual in the {self.profession} industry. This quote should inspire {self.user_name}. "
                 f"The user is working on the following task(s) during this work session:'{current_todo}'. Give tips for how to make progress on these tasks.  " 
                 f"Begin the message with {self.user_name}'s name to grab their attention immediately. Follow with the quote and conclude with a brief reminder of their task, any tips you have for making progress on those specific tasks, and an encouraging statement that incorporates humor and irony. No coffee references. "
-                f"Design this message to be concise, engaging, and easily readable aloud by a voice assistant. No hashtags. The entire message should be a single, impactful paragraph that subtly blends humor/irony with motivation written in a way that will be easy to say by a text to speech model."
+                f"Design this message to be concise, engaging, and easily readable aloud by a voice assistant. No hashtags. The entire message should be a single, impactful paragraph that subtly blends humor/irony with motivation written in a way that will be easy to say by a text to speech model. Be very brief."
             )
         elif is_long_break:
             activities = [
@@ -59,7 +59,7 @@ class AIUtils:
                 f"Keep the suggestion brief, easy to understand, and suitable for being read aloud by a voice assistant. "
                 f"Focus on activities that are scientifically proven to reduce stress and enhance focus. "
                 f"Add a touch of humor or irony to lighten the mood—because even serious break activities can have a fun side. "
-                f"Conclude with an encouraging note about tackling their tasks after the break."
+                f"Conclude with an encouraging note about tackling their tasks after the break. Be very brief."
             )
 
         chat_completion = self.client.chat.completions.create(
