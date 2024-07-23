@@ -49,7 +49,7 @@ class VoiceAssistant:
             {"role": "system", "content": (
                 "As a voice-activated personal productivity coach AI within a Pomodoro app, your primary role is to enhance the user's productivity and time management skills with extremely brief, spoken responses. "
                 "Limit each response to a single, concise sentence that captures the most crucial point or question. "
-                "When shown a screenshot, quickly identify distractions like social media and remind the user to focus on their main task. "
+                "You can sometimes see the users screen when they include a screen shot in the message, if asked, tell the user what you see on the screen. When shown a screenshot, quickly identify distractions like social media and remind the user to focus on their main task. "
                 "Greet users by asking what they'd like to work on today, and feel free to ask for their name to personalize future interactions. "
                 "Use the conversation history to tailor your brief suggestions and questions about their projects and tasks. "
                 "Guide users in planning effective 25-minute work sessions and 5-minute breaks, aiming for four sessions in a 2-hour cycle. "
@@ -143,17 +143,29 @@ class VoiceAssistant:
             # Start with the system message
             messages = [self.conversation_history[0]]  # System message
             
-            # Add the most recent messages from the conversation history
-            messages.extend(self.conversation_history[1:self.max_history_length])
+            # Add context about conversation history
+            if len(self.conversation_history) > 1:
+                context_message = {
+                    "role": "system",
+                    "content": "The following messages are from the previous conversation. Use them as context for your response:"
+                }
+                messages.append(context_message)
+                
+                # Add the most recent messages from the conversation history
+                messages.extend(self.conversation_history[1:self.max_history_length])
+            
+            # Add a separator to indicate the start of the new interaction
+            messages.append({
+                "role": "system",
+                "content": "The following is the latest message from the user. Respond to this message while considering the context above:"
+            })
             
             # Add the new user message
             user_message = {"role": "user", "content": text}
             self.db.add_message("user", text)
             messages.append(user_message)
 
-            logging.info(f"Sending request to AI with {len(messages)} messages")
-            
-            # Include screenshot in the current request if available, but don't save it in history
+            # Include screenshot in the current request if available
             if screenshot_base64:
                 current_message = messages[-1].copy()
                 current_message["content"] = [
@@ -168,11 +180,28 @@ class VoiceAssistant:
                 ]
                 messages[-1] = current_message
                 logging.info("Screenshot included in the current request")
-            else:
-                logging.info("No screenshot included in the request")
+
+            # Log the messages being sent to the AI
+            print("\n" + "="*50)
+            print("Messages being sent to OpenAI:")
+            print("="*50)
+            for idx, msg in enumerate(messages):
+                role = msg['role']
+                content = msg['content']
+                if isinstance(content, list):
+                    text_content = next((item['text'] for item in content if item['type'] == 'text'), "")
+                    print(f"{idx + 1}. Role: {role}")
+                    print(f"   Content: {text_content[:100]}...")
+                    print(f"   [Screenshot data included]")
+                else:
+                    print(f"{idx + 1}. Role: {role}")
+                    print(f"   Content: {content[:100]}...")
+                print("-" * 30)
+
+            logging.info(f"Sending request to OpenAI with {len(messages)} messages")
 
             response = self.client.chat.completions.create(
-                model="gpt-4o-mini",
+                model="gpt-4o",
                 messages=messages,
                 max_tokens=2000
             )
@@ -191,6 +220,19 @@ class VoiceAssistant:
         except Exception as e:
             logging.error(f"Error generating response: {e}")
             return ""
+
+    def summarize_messages(self, messages):
+        """Summarize the message structure without including full content."""
+        return [
+            {
+                "role": msg["role"],
+                "content_type": (
+                    "text" if isinstance(msg["content"], str) 
+                    else [item["type"] for item in msg["content"]]
+                )
+            }
+            for msg in messages
+        ]
 
     @timer
     def text_to_speech(self, text):
