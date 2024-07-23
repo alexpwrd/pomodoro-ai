@@ -143,17 +143,29 @@ class VoiceAssistant:
             # Start with the system message
             messages = [self.conversation_history[0]]  # System message
             
-            # Add the most recent messages from the conversation history
-            messages.extend(self.conversation_history[1:self.max_history_length])
+            # Add context about conversation history
+            if len(self.conversation_history) > 1:
+                context_message = {
+                    "role": "system",
+                    "content": "The following messages are from the previous conversation. Use them as context for your response:"
+                }
+                messages.append(context_message)
+                
+                # Add the most recent messages from the conversation history
+                messages.extend(self.conversation_history[1:self.max_history_length])
+            
+            # Add a separator to indicate the start of the new interaction
+            messages.append({
+                "role": "system",
+                "content": "The following is the latest message from the user. Respond to this message while considering the context above:"
+            })
             
             # Add the new user message
             user_message = {"role": "user", "content": text}
             self.db.add_message("user", text)
             messages.append(user_message)
 
-            logging.info(f"Sending request to AI with {len(messages)} messages")
-            
-            # Include screenshot in the current request if available, but don't save it in history
+            # Include screenshot in the current request if available
             if screenshot_base64:
                 current_message = messages[-1].copy()
                 current_message["content"] = [
@@ -168,16 +180,28 @@ class VoiceAssistant:
                 ]
                 messages[-1] = current_message
                 logging.info("Screenshot included in the current request")
-                logging.info(f"Screenshot base64 length: {len(screenshot_base64)}")
-                logging.info(f"First 50 characters of base64: {screenshot_base64[:50]}...")
-            else:
-                logging.info("No screenshot included in the request")
 
-            # Log a summary of the final message structure
-            logging.info(f"Final message structure: {self.summarize_messages(messages)}")
+            # Log the messages being sent to the AI
+            print("\n" + "="*50)
+            print("Messages being sent to OpenAI:")
+            print("="*50)
+            for idx, msg in enumerate(messages):
+                role = msg['role']
+                content = msg['content']
+                if isinstance(content, list):
+                    text_content = next((item['text'] for item in content if item['type'] == 'text'), "")
+                    print(f"{idx + 1}. Role: {role}")
+                    print(f"   Content: {text_content[:100]}...")
+                    print(f"   [Screenshot data included]")
+                else:
+                    print(f"{idx + 1}. Role: {role}")
+                    print(f"   Content: {content[:100]}...")
+                print("-" * 30)
+
+            logging.info(f"Sending request to OpenAI with {len(messages)} messages")
 
             response = self.client.chat.completions.create(
-                model="gpt-4o-mini",
+                model="gpt-4o",
                 messages=messages,
                 max_tokens=2000
             )
