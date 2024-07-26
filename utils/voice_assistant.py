@@ -38,7 +38,7 @@ class VoiceAssistant:
         self.audiofiles_dir = os.path.join(os.path.dirname(__file__), '..', 'audiofiles')
         self.client = OpenAI(api_key=APIKeyManager().get_api_key())
         self.db = ConversationDatabase()
-        self.max_history_length = 10
+        self.max_history_length = 30
         self.load_conversation_history()
         self.stream_active = False
         self.volume = 1.0
@@ -107,14 +107,52 @@ class VoiceAssistant:
             return None
 
     @timer
-    def record_audio_vad(self, filename="output.wav", fs=44100, duration=5):
+    def record_audio_vad(self, filename="output.wav", fs=16000, max_duration=20, vad_sensitivity=3):
         filename = os.path.join(self.audiofiles_dir, filename)
-        logging.info("Starting recording...")
-        
+        logging.info("Starting recording with VAD...")
+
+        vad = webrtcvad.Vad(vad_sensitivity)
+        chunk_duration = 0.03  # 30 ms
+        chunk_size = int(fs * chunk_duration)
+        num_silent_chunks = int(0.5 / chunk_duration)  # 0.5 seconds of silence
+        silent_chunks = 0
+        stop_recording = False
+
         try:
-            recording = sd.rec(int(duration * fs), samplerate=fs, channels=1, device=self.input_device)
-            sd.wait()
-            
+            recording = []
+            start_time = time.time()
+
+            def callback(indata, frames, time_info, status):
+                nonlocal silent_chunks, stop_recording
+                if status:
+                    logging.warning(f"Recording status: {status}")
+
+                # Ensure the audio data is in 16-bit PCM format
+                audio_data = indata[:, 0].astype(np.int16).tobytes()
+
+                is_speech = vad.is_speech(audio_data, fs)
+                logging.debug(f"is_speech: {is_speech}, silent_chunks: {silent_chunks}")
+
+                if is_speech:
+                    silent_chunks = 0
+                else:
+                    silent_chunks += 1
+
+                recording.append(indata.copy())
+
+                if silent_chunks > num_silent_chunks:
+                    logging.info("Silence detected, stopping recording.")
+                    stop_recording = True
+
+                if time_info.currentTime - start_time > max_duration:
+                    logging.info("Max duration reached, stopping recording.")
+                    stop_recording = True
+
+            with sd.InputStream(samplerate=fs, channels=1, dtype='int16', callback=callback, blocksize=chunk_size) as stream:
+                while not stop_recording:
+                    sd.sleep(100)
+
+            recording = np.concatenate(recording, axis=0)
             sf.write(filename, recording, fs)
             logging.info(f"Recording finished and saved to {filename}")
             return True
